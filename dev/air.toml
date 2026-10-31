@@ -1,0 +1,21 @@
+# Live reload for `mise run dev`: rebuilds and restarts the app when Go code,
+# templates, CSS or config change, then reloads the open browser tab.
+# Open http://localhost:8000 (air's proxy); the app itself listens on :8001.
+root = "."
+tmp_dir = ".air"
+
+[build]
+cmd = "go build -o .air/homenclature ./cmd/homenclature"
+entrypoint = ["./.air/homenclature"]
+include_ext = ["go", "html", "css", "js", "toml"]
+exclude_dir = [".air", ".git", ".github", ".claude"]
+exclude_file = ["mise.toml"]
+exclude_regex = ["_test\\.go$"]
+
+[proxy]
+enabled = true
+proxy_port = 8000
+app_port = 8001
+
+[misc]
+clean_on_exit = true

@@ -39,9 +39,9 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 ## Commands
 
 ```
-mise install         # toolchain (go, jq)
+mise install         # toolchain (go, jq, air)
 mise run oidc        # start mock OIDC (oidc:down to stop)
-mise run dev         # run the app at http://localhost:8000
+mise run dev         # live reload at http://localhost:8000 (air proxy; app on :8001, see dev/air.toml)
 mise run check       # lint + test
 mise run docker      # build the image locally
 ```

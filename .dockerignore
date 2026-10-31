@@ -5,3 +5,4 @@ dev
 compose.yaml
 mise.toml
 *.md
+.air

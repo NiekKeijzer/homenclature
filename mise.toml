@@ -1,14 +1,16 @@
 [tools]
 go = "1.27"
 jq = "1.7" # used by .claude/hooks/go-check.sh
+air = "1.67" # live reload for `mise run dev`
 
 [tasks.dev]
-description = "Run the app at http://localhost:8000 (start `mise run oidc` first)"
-run = "go run ./cmd/homenclature"
+description = "Run the app with live reload at http://localhost:8000 (start `mise run oidc` first)"
+run = "air -c dev/air.toml"
 
 [tasks.dev.env]
 HOMENCLATURE_CONFIG = "config.example.toml"
-HOMENCLATURE_URL = "http://localhost:8000"
+HOMENCLATURE_URL = "http://localhost:8000" # air's proxy, see dev/air.toml
+HOMENCLATURE_LISTEN = ":8001"
 HOMENCLATURE_OIDC_ISSUER = "http://localhost:8080/default"
 HOMENCLATURE_OIDC_CLIENT_ID = "homenclature"
 HOMENCLATURE_OIDC_CLIENT_SECRET = "dev"
