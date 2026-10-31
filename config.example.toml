@@ -1,0 +1,82 @@
+# Homenclature dashboard config.
+#
+# Each table under [dashboards] is the dashboard for one OIDC group, keyed by
+# the group name (exact match).
+#
+# Users who match no group dashboard see the dashboard named by the
+# HOMENCLATURE_DEFAULT_DASHBOARD env var (e.g. "family"), or nothing if it's
+# unset. If it names a dashboard that doesn't exist, the app won't start.
+#
+# A user in several groups gets one merged page:
+#   - dashboards are combined in the order they appear in this file
+#   - sections with the same title become one section
+#   - within a section, links with the same url are shown once
+#
+# Fields
+#   section: title (required), links
+#   link:    title (required), url (required, absolute), icon, description
+#
+# icon: a name from https://github.com/homarr-labs/dashboard-icons (e.g. "jellyfin")
+#       or a full URL. The server fetches and caches icons.
+
+# Everyone in the household.
+[[dashboards.family.sections]]
+title = "Home"
+
+[[dashboards.family.sections.links]]
+title = "Home Assistant"
+url = "https://ha.home.example"
+icon = "home-assistant"
+description = "Lights, heating and more"
+
+[[dashboards.family.sections.links]]
+title = "Mealie"
+url = "https://recipes.home.example"
+icon = "mealie"
+description = "Recipes and meal plans"
+
+[[dashboards.family.sections]]
+title = "Media"
+
+[[dashboards.family.sections.links]]
+title = "Jellyfin"
+url = "https://jellyfin.home.example"
+icon = "jellyfin"
+description = "Movies and shows"
+
+[[dashboards.family.sections.links]]
+title = "Immich"
+url = "https://photos.home.example"
+icon = "immich"
+description = "Photos"
+
+[[dashboards.kids.sections]]
+title = "Media"
+
+[[dashboards.kids.sections.links]]
+title = "Audiobookshelf"
+url = "https://books.home.example"
+icon = "audiobookshelf"
+description = "Audiobooks"
+
+[[dashboards.parents.sections]]
+title = "Home" # merged with the family "Home" section
+
+[[dashboards.parents.sections.links]]
+title = "Paperless"
+url = "https://docs.home.example"
+icon = "paperless-ngx"
+description = "Documents"
+
+[[dashboards.parents.sections]]
+title = "Admin"
+
+[[dashboards.parents.sections.links]]
+title = "Proxmox"
+url = "https://pve.home.example"
+icon = "proxmox"
+
+[[dashboards.parents.sections.links]]
+title = "Authentik"
+url = "https://auth.home.example"
+icon = "authentik"
