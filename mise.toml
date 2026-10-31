@@ -3,8 +3,16 @@ go = "1.27"
 jq = "1.7" # used by .claude/hooks/go-check.sh
 
 [tasks.dev]
-description = "Run the app"
-run = "go run ."
+description = "Run the app at http://localhost:8000 (start `mise run oidc` first)"
+run = "go run ./cmd/homenclature"
+
+[tasks.dev.env]
+HOMENCLATURE_CONFIG = "config.example.toml"
+HOMENCLATURE_URL = "http://localhost:8000"
+HOMENCLATURE_OIDC_ISSUER = "http://localhost:8080/default"
+HOMENCLATURE_OIDC_CLIENT_ID = "homenclature"
+HOMENCLATURE_OIDC_CLIENT_SECRET = "dev"
+HOMENCLATURE_SESSION_SECRET = "dev-only-session-secret-not-for-production"
 
 [tasks.oidc]
 description = "Start mock OIDC at http://localhost:8080/default"

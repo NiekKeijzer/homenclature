@@ -45,6 +45,12 @@ icon = "jellyfin"
 description = "Movies and shows"
 
 [[dashboards.family.sections.links]]
+title = "Seerr"
+url = "https://seer.home.example"
+icon = "seerr"
+description = "Request a new movie"
+
+[[dashboards.family.sections.links]]
 title = "Immich"
 url = "https://photos.home.example"
 icon = "immich"

@@ -1,0 +1,179 @@
+:root {
+  --bg: #e9edf6;
+  --blob-1: #ff9f8f;
+  --blob-2: #7fe0f5;
+  --blob-3: #b9a2ff;
+  --blob-4: #ffd48f;
+  --text: #1b1e29;
+  --muted: rgba(27, 30, 41, 0.6);
+  --glass: rgba(255, 255, 255, 0.38);
+  --glass-hover: rgba(255, 255, 255, 0.56);
+  --edge: rgba(255, 255, 255, 0.7);
+  --shadow: 0 8px 32px rgba(31, 38, 70, 0.12);
+  --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0f1d;
+    --blob-1: #5b2fd6;
+    --blob-2: #0b8fa6;
+    --blob-3: #a3266a;
+    --blob-4: #2d4bc4;
+    --text: #eef0f8;
+    --muted: rgba(238, 240, 248, 0.6);
+    --glass: rgba(255, 255, 255, 0.08);
+    --glass-hover: rgba(255, 255, 255, 0.14);
+    --edge: rgba(255, 255, 255, 0.16);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    --highlight: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* Colourful blobs behind the glass; fixed so they don't scroll. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(40vmax 40vmax at 8% 12%, var(--blob-1), transparent 70%),
+    radial-gradient(36vmax 36vmax at 92% 8%, var(--blob-2), transparent 70%),
+    radial-gradient(46vmax 46vmax at 78% 92%, var(--blob-3), transparent 70%),
+    radial-gradient(32vmax 32vmax at 12% 88%, var(--blob-4), transparent 70%);
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: clamp(32px, 7vw, 80px) 16px;
+}
+
+.greeting {
+  margin: 0 0 2.25rem;
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+section + section {
+  margin-top: 2.25rem;
+}
+
+h2 {
+  margin: 0 0 0.75rem 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr));
+  gap: 14px;
+}
+
+.link,
+.empty {
+  background: var(--glass);
+  border: 1px solid var(--edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow), var(--highlight);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.link:hover {
+  background: var(--glass-hover);
+  transform: translateY(-2px);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+/* First letter of the title, covered by the icon once it loads. */
+.icon {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: 650;
+  background: var(--glass-hover);
+}
+
+.icon:has(img) {
+  color: transparent;
+  background: none;
+}
+
+.icon img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  font-weight: 600;
+}
+
+.description {
+  overflow: hidden;
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.empty {
+  margin: 0;
+  padding: 20px;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link {
+    transition: none;
+  }
+
+  .link:hover {
+    transform: none;
+  }
+}

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Home</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main>
+    <h1 class="greeting" data-name="{{.Name}}">Hello{{with .Name}}, {{.}}{{end}}</h1>
+
+    {{range .Sections}}
+    <section>
+      <h2>{{.Title}}</h2>
+      <div class="links">
+        {{range .Links}}
+        <a class="link" href="{{.URL}}">
+          <span class="icon" aria-hidden="true">{{initial .Title}}{{with .Icon}}<img src="{{iconURL .}}" alt="" onerror="this.remove()">{{end}}</span>
+          <span class="text">
+            <span class="title">{{.Title}}</span>
+            {{with .Description}}<span class="description">{{.}}</span>{{end}}
+          </span>
+        </a>
+        {{end}}
+      </div>
+    </section>
+    {{else}}
+    <p class="empty">No links for you yet.</p>
+    {{end}}
+  </main>
+
+  <script>
+    // Greet by the visitor's local time; the server doesn't know their timezone.
+    const h = new Date().getHours();
+    const part = h >= 5 && h < 12 ? "morning" : h >= 12 && h < 18 ? "afternoon" : "evening";
+    const greeting = document.querySelector(".greeting");
+    const name = greeting.dataset.name;
+    greeting.textContent = "Good " + part + (name ? ", " + name : "");
+  </script>
+</body>
+</html>

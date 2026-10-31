@@ -39,7 +39,7 @@ func TestExampleConfig(t *testing.T) {
 	got := summary(c.Sections([]string{"parents", "family"}))
 	want := []string{
 		"Home: Home Assistant, Mealie, Paperless",
-		"Media: Jellyfin, Immich",
+		"Media: Jellyfin, Seerr, Immich",
 		"Admin: Proxmox, Authentik",
 	}
 	if !slices.Equal(got, want) {
