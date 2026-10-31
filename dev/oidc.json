@@ -1,0 +1,25 @@
+{
+  "interactiveLogin": true,
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "requestMappings": [
+        {
+          "requestParam": "subject",
+          "match": "parent",
+          "claims": { "preferred_username": "${subject}", "name": "Parent", "groups": ["family", "parents"] }
+        },
+        {
+          "requestParam": "subject",
+          "match": "kid",
+          "claims": { "preferred_username": "${subject}", "name": "Kid", "groups": ["family", "kids"] }
+        },
+        {
+          "requestParam": "subject",
+          "match": ".*",
+          "claims": { "preferred_username": "${subject}" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+[tools]
+go = "1.27"
+jq = "1.7" # used by .claude/hooks/go-check.sh
+
+[tasks.dev]
+description = "Run the app"
+run = "go run ."
+
+[tasks.oidc]
+description = "Start mock OIDC at http://localhost:8080/default"
+run = "docker compose up -d oidc"
+
+[tasks."oidc:down"]
+description = "Stop mock OIDC"
+run = "docker compose down"
+
+[tasks.test]
+description = "Run tests"
+run = "go test ./..."
+
+[tasks.lint]
+description = "Check gofmt and run go vet"
+run = '''
+unformatted=$(gofmt -l .)
+if [ -n "$unformatted" ]; then echo "needs gofmt:"; echo "$unformatted"; exit 1; fi
+go vet ./...
+'''
+
+[tasks.check]
+description = "Lint + test (run before calling work done)"
+depends = ["lint", "test"]
+
+[tasks.docker]
+description = "Build the Docker image locally"
+run = "docker build -t homenclature:dev ."

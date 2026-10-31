@@ -1,0 +1,7 @@
+.git
+.github
+.claude
+dev
+compose.yaml
+mise.toml
+*.md

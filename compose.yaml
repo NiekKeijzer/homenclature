@@ -1,0 +1,9 @@
+services:
+  oidc:
+    image: ghcr.io/navikt/mock-oauth2-server:6.1.4
+    ports:
+      - "8080:8080"
+    environment:
+      JSON_CONFIG_PATH: /config/oidc.json
+    volumes:
+      - ./dev/oidc.json:/config/oidc.json:ro
