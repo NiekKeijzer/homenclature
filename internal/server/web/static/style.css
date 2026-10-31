@@ -34,31 +34,38 @@
   box-sizing: border-box;
 }
 
+/* Colourful blobs behind the glass. They're painted on the page itself (not a
+   fixed layer) so iOS Safari also shows them behind its status bar and
+   toolbar instead of black bars. iOS ignores `fixed` and scrolls them. */
+html {
+  min-height: 100%;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(40vmax 40vmax at 8% 12%, var(--blob-1), transparent 70%),
+    radial-gradient(36vmax 36vmax at 92% 8%, var(--blob-2), transparent 70%),
+    radial-gradient(46vmax 46vmax at 78% 92%, var(--blob-3), transparent 70%),
+    radial-gradient(32vmax 32vmax at 12% 88%, var(--blob-4), transparent 70%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--text);
-  background: var(--bg);
 }
 
-/* Colourful blobs behind the glass; fixed so they don't scroll. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(40vmax 40vmax at 8% 12%, var(--blob-1), transparent 70%),
-    radial-gradient(36vmax 36vmax at 92% 8%, var(--blob-2), transparent 70%),
-    radial-gradient(46vmax 46vmax at 78% 92%, var(--blob-3), transparent 70%),
-    radial-gradient(32vmax 32vmax at 12% 88%, var(--blob-4), transparent 70%);
-}
-
+/* The page runs under the notch and home indicator (viewport-fit=cover), so
+   keep content inside the safe area. */
 main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: clamp(32px, 7vw, 80px) 16px;
+  padding:
+    calc(clamp(32px, 7vw, 80px) + env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    calc(clamp(32px, 7vw, 80px) + env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
 }
 
 .greeting {
