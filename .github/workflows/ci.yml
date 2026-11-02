@@ -88,3 +88,13 @@ jobs:
         run: |
           git tag "$TAG"
           git push origin "$TAG"
+      # Docker Hub shows the README from main. Relative links and images
+      # become GitHub URLs. Needs a token with read/write/delete scope.
+      - if: github.ref == 'refs/heads/main'
+        uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: niekkeijzer/homenclature
+          short-description: A family-first start page for the self-hosted home. OIDC groups decide who sees which links.
+          enable-url-completion: true

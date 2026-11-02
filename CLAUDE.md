@@ -9,6 +9,8 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 - Keep it small: stdlib first. Ask before adding a dependency.
 - Done means `mise run check` passes. For UI or auth changes, also run the app and log in through the mock OIDC.
 - Commit or push only when asked.
+- Significant changes, especially visible ones, get a screenshot in `docs/screenshots/` shown in `README.md`. Take it from the running app (example config, 2x scale). If the repo then holds more than 3 screenshots, ask the dev which to keep.
+- `README.md` is also the Docker Hub description (synced by CI). Use links relative to the repo root; CI makes them absolute.
 
 ## Decisions
 
