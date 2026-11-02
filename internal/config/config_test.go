@@ -38,8 +38,8 @@ func TestExampleConfig(t *testing.T) {
 	}
 	got := summary(c.Sections([]string{"parents", "family"}))
 	want := []string{
-		"Home: Home Assistant, Mealie, Paperless",
 		"Media: Jellyfin, Seerr, Immich",
+		"Home: Home Assistant, Mealie, Paperless",
 		"Admin: Proxmox, Authentik",
 	}
 	if !slices.Equal(got, want) {
@@ -74,6 +74,11 @@ title = "Media"
 title = "Jellyfin"
 url = "jellyfin.home"
 `, `dashboards.kids.sections[0].links[0]: url must be absolute, got "jellyfin.home"`},
+		"unknown layout": {`
+[[dashboards.kids.sections]]
+title = "Media"
+layout = "grid"
+`, `dashboards.kids.sections[0]: layout must be list or cards, got "grid"`},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -147,6 +152,35 @@ func TestSections(t *testing.T) {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSectionsLayout(t *testing.T) {
+	t.Setenv(DefaultDashboardEnv, "")
+	c, err := load(t, `
+[[dashboards.family.sections]]
+title = "Media"
+[[dashboards.family.sections]]
+title = "Home"
+layout = "list"
+
+[[dashboards.parents.sections]]
+title = "Media"
+layout = "cards"
+[[dashboards.parents.sections]]
+title = "Home"
+layout = "cards"
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, s := range c.Sections([]string{"family", "parents"}) {
+		got = append(got, s.Title+": "+s.Layout)
+	}
+	// Media: family sets none, so parents' cards applies. Home: family's list wins.
+	if want := []string{"Media: cards", "Home: list"}; !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
 	}
 }
 

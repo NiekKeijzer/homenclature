@@ -16,11 +16,11 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 - Frontend: Go `html/template` + HTMX + plain CSS, embedded with `go:embed`. HTMX is vendored (no CDN). Glass look via `backdrop-filter`.
 - Auth: OIDC. The prod IdP is Authentik, which sends group names in the `groups` claim.
 - Config: the TOML file holds only dashboards (parsed with `BurntSushi/toml`). App settings (OIDC, server) and secrets come from env vars prefixed `HOMENCLATURE_`. No database, no persistent state.
-- Dashboards (`config.example.toml`, `internal/config`): one per OIDC group, keyed by group name. `HOMENCLATURE_DEFAULT_DASHBOARD` names the dashboard for users who match none (unset: they see nothing; names a missing dashboard: startup error). A user in several groups gets one merged page: file order, same-title sections merged, links deduped by URL. Links are written inline in sections. Sections only have a title.
+- Dashboards (`config.example.toml`, `internal/config`): one per OIDC group, keyed by group name. `HOMENCLATURE_DEFAULT_DASHBOARD` names the dashboard for users who match none (unset: they see nothing; names a missing dashboard: startup error). A user in several groups gets one merged page: file order, same-title sections merged, links deduped by URL. Links are written inline in sections. Sections have a title and an optional `layout`: `list` (default) or `cards`; when sections merge, the first layout set wins.
 - Icons: `icon` is a dashboard-icons name or a URL. `/icons/{hash}` fetches it (SVG, then PNG fallback) and caches it in memory. Only icons from the config can be fetched.
 - Auth: `coreos/go-oidc/v3` + `golang.org/x/oauth2`, with PKCE, state and nonce. Groups come from the `groups` claim, scopes `openid profile email`.
 - Sessions: AES-GCM encrypted cookie (stdlib), key from `HOMENCLATURE_SESSION_SECRET`, valid for 24h. No logout button.
-- Page: greeting with first name (time of day computed in the browser), light/dark mode follows the system. HTMX isn't vendored yet; add it when something first needs it.
+- Page (look "D: search first", see the mockups canvas): a clock with the date and greeting (first name), computed in the browser; a search pill that filters links client-side (`/` focuses, Enter opens the first match, Esc clears; in-app search lives on the `feat/app-search` branch); sections as glass panels (cards sections get a full row; neighbouring list sections share a row when there's room). Dark with glow blobs by default, a pastel light version when the system is light. Sora (OFL, self-hosted in `web/static/fonts`) for the clock and headings, system fonts otherwise. JS is in `web/static/app.js`. HTMX isn't vendored on main yet; add it when something first needs it.
 
 ## Env vars
 

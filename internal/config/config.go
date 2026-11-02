@@ -28,8 +28,9 @@ type Dashboard struct {
 }
 
 type Section struct {
-	Title string `toml:"title"`
-	Links []Link `toml:"links"`
+	Title  string `toml:"title"`
+	Layout string `toml:"layout"` // "list" (default) or "cards"
+	Links  []Link `toml:"links"`
 }
 
 type Link struct {
@@ -78,6 +79,9 @@ func (c *Config) validate() error {
 			if s.Title == "" {
 				errs = append(errs, fmt.Errorf("%s: title is required", at))
 			}
+			if s.Layout != "" && s.Layout != "list" && s.Layout != "cards" {
+				errs = append(errs, fmt.Errorf("%s: layout must be list or cards, got %q", at, s.Layout))
+			}
 			for j, l := range s.Links {
 				at := fmt.Sprintf("%s.links[%d]", at, j)
 				if l.Title == "" {
@@ -94,8 +98,8 @@ func (c *Config) validate() error {
 
 // Sections returns what a user in the given groups sees: their group
 // dashboards merged in file order, or the default dashboard if none match.
-// Sections with the same title are merged, and within a section links with
-// the same URL appear once.
+// Sections with the same title are merged (the first layout set wins), and
+// within a section links with the same URL appear once.
 func (c *Config) Sections(groups []string) []Section {
 	var names []string
 	for _, name := range c.order {
@@ -114,6 +118,9 @@ func (c *Config) Sections(groups []string) []Section {
 			if i < 0 {
 				out = append(out, Section{Title: s.Title})
 				i = len(out) - 1
+			}
+			if out[i].Layout == "" {
+				out[i].Layout = s.Layout
 			}
 			for _, l := range s.Links {
 				if !slices.ContainsFunc(out[i].Links, func(o Link) bool { return o.URL == l.URL }) {

@@ -75,7 +75,10 @@ func TestPageShowsLinksForGroups(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("got status %d", resp.StatusCode)
 	}
-	for _, want := range []string{"Hello, Niek", "Paperless", "Proxmox", "Jellyfin", `src="` + iconURL("jellyfin") + `"`} {
+	for _, want := range []string{
+		"Hello, Niek", "Paperless", "Proxmox", "Jellyfin", `src="` + iconURL("jellyfin") + `"`,
+		`class="search glass"`, `class="panel glass list"`, `class="panel glass cards"`,
+	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("page is missing %q", want)
 		}

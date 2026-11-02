@@ -9,10 +9,23 @@
 </head>
 <body>
   <main>
-    <h1 class="greeting" data-name="{{.Name}}">Hello{{with .Name}}, {{.}}{{end}}</h1>
+    <header class="hero">
+      <p class="clock" aria-hidden="true"></p>
+      <h1 class="greeting" data-name="{{.Name}}">Hello{{with .Name}}, {{.}}{{end}}</h1>
+    </header>
 
-    {{range .Sections}}
-    <section>
+    {{if .Sections}}
+    <label class="search glass">
+      <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input type="search" placeholder="Search your links" aria-label="Search your links" autocomplete="off" spellcheck="false">
+      <kbd aria-hidden="true">/</kbd>
+    </label>
+    {{end}}
+
+    {{with .Sections}}
+    <div class="sections">
+    {{range .}}
+    <section class="panel glass {{or .Layout "list"}}">
       <h2>{{.Title}}</h2>
       <div class="links">
         {{range .Links}}
@@ -26,18 +39,14 @@
         {{end}}
       </div>
     </section>
-    {{else}}
-    <p class="empty">No links for you yet.</p>
     {{end}}
+    </div>
+    {{else}}
+    <p class="empty glass">No links for you yet.</p>
+    {{end}}
+    <p class="empty glass no-matches" hidden>No matches.</p>
   </main>
 
-  <script>
-    // Greet by the visitor's local time; the server doesn't know their timezone.
-    const h = new Date().getHours();
-    const part = h >= 5 && h < 12 ? "morning" : h >= 12 && h < 18 ? "afternoon" : "evening";
-    const greeting = document.querySelector(".greeting");
-    const name = greeting.dataset.name;
-    greeting.textContent = "Good " + part + (name ? ", " + name : "");
-  </script>
+  <script src="/static/app.js"></script>
 </body>
 </html>

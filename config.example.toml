@@ -13,7 +13,10 @@
 #   - within a section, links with the same url are shown once
 #
 # Fields
-#   section: title (required), links
+#   section: title (required), layout, links
+#            layout: "list" (default; rows with descriptions) or "cards" (big cards);
+#            on wide screens, neighbouring list sections sit side by side;
+#            when sections merge, the first layout set wins
 #   link:    title (required), url (required, absolute), icon, description
 #
 # icon: a name from https://github.com/homarr-labs/dashboard-icons (e.g. "jellyfin")
@@ -21,22 +24,8 @@
 
 # Everyone in the household.
 [[dashboards.family.sections]]
-title = "Home"
-
-[[dashboards.family.sections.links]]
-title = "Home Assistant"
-url = "https://ha.home.example"
-icon = "home-assistant"
-description = "Lights, heating and more"
-
-[[dashboards.family.sections.links]]
-title = "Mealie"
-url = "https://recipes.home.example"
-icon = "mealie"
-description = "Recipes and meal plans"
-
-[[dashboards.family.sections]]
 title = "Media"
+layout = "cards"
 
 [[dashboards.family.sections.links]]
 title = "Jellyfin"
@@ -56,6 +45,21 @@ url = "https://photos.home.example"
 icon = "immich"
 description = "Photos"
 
+[[dashboards.family.sections]]
+title = "Home"
+
+[[dashboards.family.sections.links]]
+title = "Home Assistant"
+url = "https://ha.home.example"
+icon = "home-assistant"
+description = "Lights, heating and more"
+
+[[dashboards.family.sections.links]]
+title = "Mealie"
+url = "https://recipes.home.example"
+icon = "mealie"
+description = "Recipes and meal plans"
+
 [[dashboards.kids.sections]]
 title = "Media"
 
@@ -66,7 +70,7 @@ icon = "audiobookshelf"
 description = "Audiobooks"
 
 [[dashboards.parents.sections]]
-title = "Home" # merged with the family "Home" section
+title = "Home" # merged with the family "Home" section; Admin sits beside it
 
 [[dashboards.parents.sections.links]]
 title = "Paperless"
