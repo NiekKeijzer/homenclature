@@ -1,10 +1,19 @@
 [tools]
 go = "1.27"
+node = "26" # npm installs HTMX and the Sora font, see package.json
 jq = "1.8.2" # used by .claude/hooks/go-check.sh
 air = "1.67" # live reload for `mise run dev`
 
+[tasks.assets]
+description = "Install HTMX and the Sora font from npm into internal/server/web/static/lib"
+run = "npm ci && npm run assets"
+# Skipped while lib is newer than these
+sources = ["package.json", "package-lock.json"]
+outputs = ["internal/server/web/static/lib/*"]
+
 [tasks.dev]
 description = "Run the app with live reload at http://localhost:8000 (start `mise run oidc` first)"
+depends = ["assets"]
 run = "air -c dev/air.toml"
 
 [tasks.dev.env]
@@ -35,10 +44,12 @@ run = "docker compose down"
 
 [tasks.test]
 description = "Run tests"
+depends = ["assets"]
 run = "go test ./..."
 
 [tasks.lint]
 description = "Check gofmt and run go vet"
+depends = ["assets"] # go vet compiles the embedded files
 run = '''
 unformatted=$(gofmt -l .)
 if [ -n "$unformatted" ]; then echo "needs gofmt:"; echo "$unformatted"; exit 1; fi

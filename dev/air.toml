@@ -8,7 +8,7 @@ tmp_dir = ".air"
 cmd = "go build -o .air/homenclature ./cmd/homenclature"
 entrypoint = ["./.air/homenclature"]
 include_ext = ["go", "html", "css", "js", "toml"]
-exclude_dir = [".air", ".git", ".github", ".claude"]
+exclude_dir = [".air", ".git", ".github", ".claude", "node_modules"]
 exclude_file = ["mise.toml"]
 exclude_regex = ["_test\\.go$"]
 

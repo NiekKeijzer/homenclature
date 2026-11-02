@@ -7,3 +7,5 @@ mise.toml
 *.md
 .air
 docs
+node_modules
+internal/server/web/static/lib

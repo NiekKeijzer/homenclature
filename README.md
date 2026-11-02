@@ -111,7 +111,7 @@ See [config.example.toml](config.example.toml) for every field, which token each
 You need [mise](https://mise.jdx.dev) and Docker.
 
 ```sh
-mise install     # Go and the dev tools
+mise install     # Go, Node and the dev tools
 mise run oidc    # mock OIDC server on :8080
 mise run dev     # http://localhost:8000, reloads when you save
 mise run check   # lint and tests
@@ -121,4 +121,4 @@ On the mock login form, sign in as `parent` or `kid` to see their pages.
 
 ## License
 
-[MIT](LICENSE). The bundled Sora font is under the [SIL Open Font License](internal/server/web/static/fonts/OFL.txt).
+[MIT](LICENSE). The bundled Sora font is under the [SIL Open Font License](https://github.com/sora-xor/sora-font/blob/master/OFL.txt).
