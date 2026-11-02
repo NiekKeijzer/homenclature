@@ -34,7 +34,9 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 | `HOMENCLATURE_DEFAULT_DASHBOARD` | unset |
 
 `mise run dev` sets dev values for all of these.
-- Images: `ghcr.io/niekkeijzer/homenclature` and `docker.io/niekkeijzer/homenclature`, for amd64 and arm64. `v*` tags publish semver tags + `latest`; `main` publishes `edge`. See `.github/workflows/docker.yml`. Docker Hub needs the `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` repo secrets.
+- Images: `ghcr.io/niekkeijzer/homenclature` and `docker.io/niekkeijzer/homenclature`, for amd64 and arm64. `v*` tags publish semver tags + `latest`; `main` publishes `edge`. See `.github/workflows/ci.yml`. Docker Hub needs the `DOCKERHUB_USERNAME` repo variable and the `DOCKERHUB_TOKEN` repo secret.
+- CI (`.github/workflows/ci.yml`): `mise run check` on every push to `main`, `v*` tag and pull request. Images are published only after it passes.
+- Renovate (`.github/renovate.json5`): actions and images pinned to digests. Minor, patch and digest updates automerge; majors request a review from NiekKeijzer. When an automerged update changes `go.mod`, `go.sum` or the `Dockerfile`, CI publishes the next patch release (needs a first `v*` tag pushed by hand).
 
 ## Commands
 

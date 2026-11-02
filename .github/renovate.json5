@@ -1,0 +1,24 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  // Includes pinning GitHub Actions and Docker images to digests.
+  extends: ["config:best-practices"],
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
+  packageRules: [
+    {
+      // Merged once CI passes. CI then publishes `edge` and, if the image
+      // changed, the next patch release (see .github/workflows/ci.yml).
+      matchUpdateTypes: ["minor", "patch", "digest"],
+      automerge: true,
+    },
+    {
+      matchUpdateTypes: ["major"],
+      reviewers: ["NiekKeijzer"],
+    },
+    {
+      // The Go version is in go.mod, mise.toml and the Dockerfile. Update
+      // them in one PR so CI and the image build with the same Go.
+      matchDepNames: ["go", "golang"],
+      groupName: "Go",
+    },
+  ],
+}
