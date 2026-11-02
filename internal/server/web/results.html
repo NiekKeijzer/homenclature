@@ -1,0 +1,47 @@
+{{/* Results from inside apps, swapped into #app-results by HTMX. The chips
+     replace #chips above the links (out of band). */}}
+<div id="chips" class="chips" hx-swap-oob="true">
+  {{- if .Apps}}
+  <button type="button" class="chip" data-app="" aria-pressed="true">All</button>
+  {{- range .Apps}}
+  <button type="button" class="chip" data-app="{{.Key}}" aria-pressed="false">{{with .Link.Icon}}<img src="{{iconURL .}}" alt="" onerror="this.remove()">{{end}}{{.Link.Title}}<span class="count">{{.Count}}</span></button>
+  {{- end}}
+  {{- end -}}
+</div>
+{{range $app := .Apps}}
+<section class="app glass" data-app="{{.Key}}" aria-label="{{.Link.Title}}">
+  <header>
+    {{with .Link.Icon}}<img src="{{iconURL .}}" alt="" onerror="this.remove()">{{end}}
+    <h2>{{.Link.Title}}</h2>
+    <span class="count">{{.Count}}</span>
+    <a class="open" href="{{.OpenURL}}" aria-label="{{.OpenText}} in {{.Link.Title}}">{{.OpenText}}<span class="open-in"> in {{.Link.Title}}</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+  </header>
+  {{if eq .Link.Search.Type "immich"}}
+  <div class="photos">
+    {{range .Items}}
+    <a class="result photo" href="{{.URL}}" aria-label="Photo, {{.Detail}}" title="{{.Title}}"><img src="/search/thumb/{{$app.Key}}/{{.Thumb}}" alt="" loading="lazy" onerror="this.remove()"></a>
+    {{end}}
+    {{with .Rest}}<a class="result photo rest" href="{{$app.OpenURL}}">{{.}}</a>{{end}}
+  </div>
+  {{else}}
+  <div class="results">
+    {{range .Items}}
+    <a class="result" href="{{.URL}}">
+      <span class="icon thumb" aria-hidden="true">{{initial .Title}}{{with .Thumb}}<img src="/search/thumb/{{$app.Key}}/{{.}}" alt="" loading="lazy" onerror="this.remove()">{{end}}</span>
+      <span class="text">
+        <span class="title">{{.Title}}</span>
+        {{with .Detail}}<span class="description">{{.}}</span>{{end}}
+      </span>
+      {{with .Value}}<span class="value">{{.}}</span>{{end}}
+    </a>
+    {{end}}
+  </div>
+  {{end}}
+  {{with .More}}
+  <p class="more">
+    <span>Not what you were looking for?</span>
+    {{range .}}<a href="{{.URL}}">{{.Text}}</a>{{end}}
+  </p>
+  {{end}}
+</section>
+{{end}}

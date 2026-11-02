@@ -9,6 +9,7 @@
 A family-first start page for the self-hosted home: one calm, glass-styled place where everyone in the household finds the apps and links they need.
 
 ![Homenclature in dark mode, signed in as a parent: Media cards on top, with Home and Admin links side by side below](docs/screenshots/dashboard.png)
+![Searching for "garden": chips per app above results from Jellyfin, Seerr (titles to request), Immich and Home Assistant](docs/screenshots/search.png)
 
 ## Why
 
@@ -20,6 +21,8 @@ Homenclature shows each person only the links for their groups. Everyone logs in
 
 - **Links per group.** Each OIDC group gets its own dashboard. Someone in several groups gets one merged page.
 - **Search.** Type to filter your links. `/` jumps to the search box and Enter opens the first match.
+- **Search inside your apps.** Opt in per app and the same box also finds films in Jellyfin, photos in Immich, recipes in Mealie, documents in Paperless and devices in Home Assistant. Results link straight to the item. Search only reads; it never changes anything in your apps.
+- **Request what's missing.** With Seerr opted in, search also lists matching films and shows that aren't in your library yet. One click opens the title in Seerr to request it.
 - **Icons by name.** Use any name from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons), or a URL. The server fetches and caches them.
 - **Light and dark.** Follows the system, and fits phones edge to edge.
 - **Small.** A single Go binary in a ~5 MB distroless image for amd64 and arm64.
@@ -57,6 +60,7 @@ Image tags: `latest` and versions like `0.1.0` and `0.1` for releases, `edge` fo
 | `HOMENCLATURE_DEFAULT_DASHBOARD` | Dashboard for people in none of the groups. Unset: they see no links. |
 | `HOMENCLATURE_CONFIG` | Path to the config file. Default `/config/config.toml` in Docker. |
 | `HOMENCLATURE_LISTEN` | Listen address. Default `:8000`. |
+| Your app tokens | For search inside apps: one env var per app, named in the config (`token_env`). |
 
 ## Configure
 
@@ -84,7 +88,23 @@ url = "https://pve.home.example"
 icon = "proxmox"
 ```
 
-See [config.example.toml](config.example.toml) for every field and how pages merge.
+### Search inside apps
+
+Add a `search` table to a link to search that app from the search box. The API token comes from the env var you name in `token_env`, never from the file.
+
+```toml
+[[dashboards.family.sections.links]]
+title = "Jellyfin"
+url = "https://jellyfin.home.example"
+icon = "jellyfin"
+search = { type = "jellyfin", token_env = "JELLYFIN_TOKEN", seerr_url = "https://seerr.home.example" }
+```
+
+Types: `home-assistant`, `immich`, `jellyfin`, `mealie`, `paperless` and `seerr`. Optional for all: `api_url` (where the server reaches the app, e.g. `http://jellyfin:8096`) and `limit` (results shown). Jellyfin also takes `types` (which kinds of items) and `seerr_url` (adds "Request it in Seerr" for people who can't search Seerr itself). Home Assistant takes `domains`, e.g. `["light", "sensor"]`.
+
+Searches run with that token, so results show what the token can see, to anyone with the link on their page. Give each group its own token where that matters (e.g. a kids' Jellyfin user).
+
+See [config.example.toml](config.example.toml) for every field, which token each app needs, and how pages merge.
 
 ## Develop
 

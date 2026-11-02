@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -30,7 +31,15 @@ func summary(sections []Section) []string {
 	return out
 }
 
+// setExampleTokens sets the search token env vars config.example.toml needs.
+func setExampleTokens(t *testing.T) {
+	for _, app := range []string{"HOME_ASSISTANT", "IMMICH", "JELLYFIN", "MEALIE", "PAPERLESS", "SEERR"} {
+		t.Setenv("HOMENCLATURE_"+app+"_TOKEN", "test")
+	}
+}
+
 func TestExampleConfig(t *testing.T) {
+	setExampleTokens(t)
 	t.Setenv(DefaultDashboardEnv, "family")
 	c, err := Load("../../config.example.toml")
 	if err != nil {
@@ -79,6 +88,26 @@ url = "jellyfin.home"
 title = "Media"
 layout = "grid"
 `, `dashboards.kids.sections[0]: layout must be list or cards, got "grid"`},
+		"unknown search type": {searchLink(`type = "plex", token_env = "HOME"`),
+			`search: type must be one of home-assistant, immich, jellyfin, mealie, paperless, seerr, got "plex"`},
+		"unknown search key": {searchLink(`type = "jellyfin", token_env = "HOME", tokn = "x"`),
+			"unknown keys: [dashboards.kids.sections.links.search.tokn]"},
+		"search without token_env": {searchLink(`type = "jellyfin"`),
+			"search: token_env is required"},
+		"search token env unset": {searchLink(`type = "jellyfin", token_env = "HOMENCLATURE_TEST_UNSET"`),
+			"search: env var HOMENCLATURE_TEST_UNSET (token_env) is not set"},
+		"relative api_url": {searchLink(`type = "jellyfin", token_env = "HOME", api_url = "jellyfin:8096"`),
+			`search: api_url must be an http(s) URL, got "jellyfin:8096"`},
+		"relative seerr_url": {searchLink(`type = "jellyfin", token_env = "HOME", seerr_url = "/seerr"`),
+			`search: seerr_url must be an http(s) URL, got "/seerr"`},
+		"limit too high": {searchLink(`type = "jellyfin", token_env = "HOME", limit = 51`),
+			"search: limit must be between 1 and 50, got 51"},
+		"unknown jellyfin type": {searchLink(`type = "jellyfin", token_env = "HOME", types = ["Movies"]`),
+			`search: types must be from Audio, AudioBook, Book, BoxSet, Episode, Movie, MusicAlbum, MusicArtist, MusicVideo, Playlist, Season, Series, Video, got "Movies"`},
+		"types on another app": {searchLink(`type = "immich", token_env = "HOME", types = ["Movie"]`),
+			"search: types only applies to type jellyfin"},
+		"domains on another app": {searchLink(`type = "jellyfin", token_env = "HOME", domains = ["light"]`),
+			"search: domains only applies to type home-assistant"},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -87,6 +116,40 @@ layout = "grid"
 				t.Fatalf("got error %v, want %q", err, tt.want)
 			}
 		})
+	}
+}
+
+// searchLink returns a config with one link whose search table is fields.
+func searchLink(fields string) string {
+	return `
+[[dashboards.kids.sections]]
+title = "Media"
+[[dashboards.kids.sections.links]]
+title = "Jellyfin"
+url = "https://jellyfin.example"
+search = { ` + fields + ` }
+`
+}
+
+func TestSearchLoaded(t *testing.T) {
+	t.Setenv("HOMENCLATURE_TEST_TOKEN", "s3cret")
+	c, err := load(t, searchLink(`type = "jellyfin", token_env = "HOMENCLATURE_TEST_TOKEN", limit = 3, types = ["Movie"], seerr_url = "https://seerr.example"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := *c.Dashboards["kids"].Sections[0].Links[0].Search
+	want := Search{Type: "jellyfin", TokenEnv: "HOMENCLATURE_TEST_TOKEN", Limit: 3, Types: []string{"Movie"}, SeerrURL: "https://seerr.example", Token: "s3cret"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("got %+v, want %+v", got, want)
+	}
+}
+
+func TestExampleConfigNeedsSearchTokens(t *testing.T) {
+	setExampleTokens(t)
+	t.Setenv("HOMENCLATURE_JELLYFIN_TOKEN", "")
+	_, err := Load("../../config.example.toml")
+	if err == nil || !strings.Contains(err.Error(), "env var HOMENCLATURE_JELLYFIN_TOKEN (token_env) is not set") {
+		t.Errorf("got %v, want an error about the unset Jellyfin token", err)
 	}
 }
 

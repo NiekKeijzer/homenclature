@@ -1,2 +1,3 @@
 # air (live reload) build output
 /.air/
+config.homelab.toml

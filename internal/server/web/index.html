@@ -15,11 +15,21 @@
     </header>
 
     {{if .Sections}}
-    <label class="search glass">
+    <div class="search glass">
       <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      {{if .Searchable}}
+      <input type="search" name="q" placeholder="Search links and apps" aria-label="Search links and apps" autocomplete="off" spellcheck="false"
+             hx-get="/search" hx-trigger="input changed delay:300ms" hx-target="#app-results" hx-sync="this:replace">
+      {{else}}
       <input type="search" placeholder="Search your links" aria-label="Search your links" autocomplete="off" spellcheck="false">
-      <kbd aria-hidden="true">/</kbd>
-    </label>
+      {{end}}
+      <kbd class="key-slash" aria-hidden="true">/</kbd>
+      <kbd class="key-esc" aria-hidden="true">esc</kbd>
+      <button type="button" class="clear" aria-label="Clear search">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="chips" class="chips"></div>
     {{end}}
 
     {{with .Sections}}
@@ -44,9 +54,17 @@
     {{else}}
     <p class="empty glass">No links for you yet.</p>
     {{end}}
+    <div id="app-results" class="app-results"></div>
     <p class="empty glass no-matches" hidden>No matches.</p>
+    <p class="hints glass" aria-hidden="true">
+      <span><kbd>↑</kbd><kbd>↓</kbd> to move</span>
+      <span><kbd>↵</kbd> to open</span>
+      <span class="tab-hint"><kbd>tab</kbd> to filter by app</span>
+      <span><kbd>esc</kbd> to clear</span>
+    </p>
   </main>
 
+  {{if .Searchable}}<script src="/static/htmx.min.js"></script>{{end}}
   <script src="/static/app.js"></script>
 </body>
 </html>

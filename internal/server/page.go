@@ -15,13 +15,13 @@ import (
 //go:embed web
 var webFS embed.FS
 
-var pageTmpl = template.Must(template.New("index.html").Funcs(template.FuncMap{
+var pageTmpl = template.Must(template.New("").Funcs(template.FuncMap{
 	"iconURL": iconURL,
 	"initial": func(s string) string {
 		r, _ := utf8.DecodeRuneInString(s)
 		return strings.ToUpper(string(r))
 	},
-}).ParseFS(webFS, "web/index.html"))
+}).ParseFS(webFS, "web/*.html"))
 
 func (a *app) routes() http.Handler {
 	static, _ := fs.Sub(webFS, "web") // can't fail: web is embedded
@@ -29,6 +29,8 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("GET /{$}", a.page)
 	mux.HandleFunc("GET /auth/login", a.login)
 	mux.HandleFunc("GET /auth/callback", a.callback)
+	mux.HandleFunc("GET /search", a.search)
+	mux.HandleFunc("GET /search/thumb/{key}/{id}", a.searchThumb)
 	mux.Handle("GET /icons/", a.icons)
 	mux.Handle("GET /static/", http.FileServerFS(static))
 	return mux
@@ -41,10 +43,11 @@ func (a *app) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := struct {
-		Name     string
-		Sections []config.Section
-	}{s.Name, a.cfg.Sections(s.Groups)}
-	if err := pageTmpl.Execute(w, data); err != nil {
+		Name       string
+		Sections   []config.Section
+		Searchable bool // apps can be searched
+	}{s.Name, a.cfg.Sections(s.Groups), len(a.searchable(s.Groups)) > 0}
+	if err := pageTmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		log.Printf("render: %v", err)
 	}
 }
