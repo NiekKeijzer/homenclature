@@ -104,12 +104,13 @@ if (slideshow) {
 // Search: filters links as you type. If apps on the page can be searched,
 // HTMX also loads results from inside them (2+ characters), with chips to
 // filter by app. "/" focuses it, ↑/↓ select a result, Enter opens it, Tab
-// moves to the next app chip and Escape clears.
+// moves to the next app chip and Escape clears. Starting with ">" lists
+// commands instead (see commands.go).
 const search = document.querySelector(".search input");
 if (search) {
   const main = document.querySelector("main");
   const links = [...document.querySelectorAll(".link")];
-  const sections = [...document.querySelectorAll(".panel")];
+  const sections = [...document.querySelectorAll(".sections .panel")];
   const linkSections = document.querySelector(".sections");
   const appResults = document.getElementById("app-results");
   const noMatches = document.querySelector(".no-matches");
@@ -118,6 +119,8 @@ if (search) {
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
   let filter = ""; // data-app of the pressed chip; "" for all
   let active = null; // the selected result
+  const hasCommands = !!document.getElementById("commands");
+  let group = ""; // the open command group; "" for the top level
 
   // Compact shrinks the clock to make room for results, while the search is
   // focused or has a query. The layout change is animated FLIP-style:
@@ -140,9 +143,7 @@ if (search) {
     });
   }
 
-  // Not for the keys link: it leaves the page.
-  const updateCompact = () =>
-    setCompact(pill.matches(":focus-within:not(:has(.keys:focus))") || search.value.trim() !== "");
+  const updateCompact = () => setCompact(pill.matches(":focus-within") || search.value.trim() !== "");
   pill.addEventListener("focusin", updateCompact);
   pill.addEventListener("focusout", (e) => {
     if (!pill.contains(e.relatedTarget)) setCompact(search.value.trim() !== "");
@@ -166,24 +167,131 @@ if (search) {
     for (const s of appResults.querySelectorAll(".app")) s.hidden = filter !== "" && s.dataset.app !== filter;
   }
 
-  // update shows what matches the query. Without keepSelection, the first
-  // result is selected.
+  // update shows what matches the query, or the commands that match after
+  // ">". Without keepSelection, the first result is selected.
   function update(keepSelection) {
-    const q = search.value.trim().toLowerCase();
-    main.classList.toggle("searching", q !== "");
+    // While asking for a key, the list and its selection stay as they are
+    // (a late HTMX answer would clear the selection).
+    if (main.classList.contains("prompting")) return;
+    const value = search.value.trim();
+    const commanding = hasCommands && value.startsWith(">");
+    const q = (commanding ? value.slice(1).trim() : value).toLowerCase();
+    main.classList.toggle("searching", value !== "");
+    main.classList.toggle("commanding", commanding);
     updateCompact();
-    for (const link of links) link.hidden = !link.querySelector(".text").textContent.toLowerCase().includes(q);
-    for (const s of sections) s.hidden = !s.querySelector(".link:not([hidden])");
-    applyFilter();
+    if (!commanding) group = "";
+    main.classList.toggle("in-group", group !== "");
+    if (commanding) {
+      // ">" alone lists the open group, or the top level. Words search the
+      // titles of all commands (or the open group), every word in any order:
+      // "> key immich".
+      const words = q.split(/\s+/).filter(Boolean);
+      for (const c of document.querySelectorAll(".command")) {
+        const listed = group ? c.dataset.group === group : words.length > 0 || !c.dataset.group;
+        const text = c.querySelector(".title").textContent.toLowerCase();
+        c.hidden = !listed || !words.every((w) => text.includes(w));
+      }
+      const opener = group && document.querySelector(`.command[data-opens="${group}"] .title`);
+      document.querySelector("#commands h2").textContent = opener ? opener.textContent : "Commands";
+    } else {
+      for (const link of links) link.hidden = !link.querySelector(".text").textContent.toLowerCase().includes(q);
+      for (const s of sections) s.hidden = !s.querySelector(".link:not([hidden])");
+      applyFilter();
+    }
     const all = results();
-    if (!q) select(null);
+    if (!value) select(null);
     else if (!keepSelection || !all.includes(active)) select(all[0]);
     // While app results may still come, don't claim there are none.
-    const waiting = searchable && q.length >= 2 && !keepSelection;
-    noMatches.hidden = !q || all.length > 0 || waiting;
+    const waiting = searchable && !commanding && q.length >= 2 && !keepSelection;
+    noMatches.hidden = !value || all.length > 0 || waiting;
   }
 
+  // Commands. One that needs a key asks for it in the pill (the prompt),
+  // then posts it; the answer is the command list, updated.
+  const prompt = document.querySelector(".prompt");
+  const note = (text, error) => {
+    const el = document.querySelector(".command-note");
+    el.textContent = text;
+    el.classList.toggle("error", !!error);
+  };
+
+  function run(command) {
+    const { opens, key, action, name, help } = command.dataset;
+    if (opens) {
+      group = opens;
+      search.value = ">";
+      update(false);
+      return search.focus();
+    }
+    if (action === "remove") return send(new URLSearchParams({ app: key, action }), command.dataset.group);
+    prompt.elements.app.value = key;
+    prompt.dataset.name = name;
+    prompt.dataset.group = command.dataset.group;
+    prompt.querySelector(".prompt-label").textContent = `${name} key`;
+    prompt.elements.key.placeholder = "Paste your key";
+    prompt.elements.key.setAttribute("aria-label", `Your ${name} key`);
+    note(`Make one in ${name}: ${help}. Enter saves it, Escape cancels.`);
+    main.classList.add("prompting");
+    prompt.elements.key.focus();
+  }
+
+  function endPrompt() {
+    main.classList.remove("prompting");
+    prompt.elements.key.value = "";
+    prompt.elements.key.readOnly = false;
+    note("");
+  }
+
+  // send posts a key command. Afterwards its group is open, to show the
+  // change.
+  async function send(body, inGroup) {
+    let resp;
+    try {
+      resp = await fetch("/commands/keys", { method: "POST", body });
+    } catch {
+      resp = null;
+    }
+    if (resp?.status === 401) return location.assign("/auth/login");
+    const text = (await resp?.text())?.trim();
+    if (!resp?.ok) {
+      prompt.elements.key.readOnly = false;
+      prompt.elements.key.select();
+      return note(text || "That didn't work. Try again.", true);
+    }
+    if (main.classList.contains("prompting")) endPrompt();
+    document.getElementById("commands").outerHTML = text;
+    group = inGroup ?? "";
+    search.value = ">";
+    update(false);
+    search.focus();
+  }
+
+  prompt?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (prompt.elements.key.readOnly) return; // already checking
+    prompt.elements.key.readOnly = true;
+    note(`Checking the key with ${prompt.dataset.name}…`);
+    send(new URLSearchParams(new FormData(prompt)), prompt.dataset.group);
+  });
+  prompt?.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      endPrompt();
+      search.focus();
+    }
+  });
+
+  // The hint under the empty search starts command mode. It keeps the focus
+  // in the search, so the hint doesn't go away under the pointer.
+  const commandHint = document.querySelector(".command-hint");
+  commandHint?.addEventListener("pointerdown", (e) => e.preventDefault());
+  commandHint?.addEventListener("click", () => {
+    search.value = ">";
+    search.focus();
+    update(false);
+  });
+
   function clear() {
+    if (main.classList.contains("prompting")) endPrompt();
     if (searchable) {
       htmx.trigger(search, "htmx:abort");
       appResults.replaceChildren();
@@ -207,13 +315,21 @@ if (search) {
       select(all[(i + all.length) % all.length], true);
     } else if (e.key === "Enter") {
       active?.click();
-    } else if (e.key === "Tab" && chips().length) {
+    } else if (e.key === "Tab" && chips().length && !main.classList.contains("commanding")) {
       e.preventDefault();
       const keys = chips().map((c) => c.dataset.app);
       const i = keys.indexOf(filter) + (e.shiftKey ? -1 : 1);
       filter = keys[(i + keys.length) % keys.length];
       update(false);
     } else if (e.key === "Escape") {
+      if (group) {
+        // Back to the top level of the commands. Not the browser's own
+        // Escape, which empties the search.
+        e.preventDefault();
+        group = "";
+        search.value = ">";
+        return update(false);
+      }
       clear();
       search.blur();
     }
@@ -225,6 +341,8 @@ if (search) {
       filter = chip.dataset.app;
       update(false);
     }
+    const command = e.target.closest("button.command");
+    if (command) run(command);
   });
 
   // The pill around the input focuses it, like a label would.
@@ -232,13 +350,14 @@ if (search) {
     if (e.target.closest(".clear")) {
       search.focus(); // first, so the clock doesn't grow and shrink again
       clear();
-    } else if (e.target !== search && !e.target.closest(".keys")) {
-      search.focus();
+    } else if (!e.target.closest("input")) {
+      (main.classList.contains("prompting") ? prompt.elements.key : search).focus();
     }
   });
 
+  // Not while typing in a field: a key may contain "/".
   document.addEventListener("keydown", (e) => {
-    if (e.key === "/" && document.activeElement !== search) {
+    if (e.key === "/" && !e.target.closest("input, textarea")) {
       e.preventDefault();
       search.focus();
     }

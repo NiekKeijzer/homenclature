@@ -36,7 +36,9 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("GET /search/thumb/{key}/{id}", a.searchThumb)
 	mux.HandleFunc("GET /background", a.backgroundPhoto)
 	mux.HandleFunc("GET /keys", a.keysPage)
-	mux.Handle("POST /keys", http.NewCrossOriginProtection().Handler(http.HandlerFunc(a.saveKey)))
+	csrf := http.NewCrossOriginProtection()
+	mux.Handle("POST /keys", csrf.Handler(http.HandlerFunc(a.saveKey)))
+	mux.Handle("POST /commands/keys", csrf.Handler(http.HandlerFunc(a.commandKey)))
 	mux.Handle("GET /icons/", a.icons)
 	mux.Handle("GET /static/", http.FileServerFS(static))
 	return mux
@@ -51,11 +53,11 @@ func (a *app) page(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Name          string
 		Sections      []config.Section
-		Searchable    bool   // apps can be searched
-		PersonalKeys  bool   // some can be searched with the user's own key
-		Background    string // the mode, see background.go
-		PhotoInterval int    // seconds between background photos; 0 without photos
-	}{s.Name, a.cfg.Sections(s.Groups), len(a.searchable(s.Groups)) > 0, len(a.keyApps(s, nil)) > 0, a.bg.mode, a.bg.photoInterval()}
+		Searchable    bool        // apps can be searched
+		Commands      commandList // for ">" in the search pill
+		Background    string      // the mode, see background.go
+		PhotoInterval int         // seconds between background photos; 0 without photos
+	}{s.Name, a.cfg.Sections(s.Groups), len(a.searchable(s.Groups)) > 0, commandList{Items: a.commands(s, a.readKeys(r, s))}, a.bg.mode, a.bg.photoInterval()}
 	if err := pageTmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		log.Printf("render: %v", err)
 	}

@@ -10,7 +10,7 @@ A family-first start page for the self-hosted home: one calm, glass-styled place
 
 ![Searching for "garden": chips per app above results from Jellyfin, Seerr (titles to request), Immich and Home Assistant](docs/screenshots/search.png)
 ![The landscape background at dusk: dark hills under a rose and violet sky, seen through the glass panels](docs/screenshots/landscape.png)
-![Your keys: Immich, Home Assistant and Mealie, each using the shared key, with a field to paste your own and where to make one](docs/screenshots/keys.png)
+![Commands: "Manage your keys", opened from ">" in the search box, lists commands to use your own key for Immich, Home Assistant, Mealie and Paperless](docs/screenshots/commands.png)
 
 ## Why
 
@@ -21,9 +21,9 @@ Homenclature shows each person only the links for their groups. Everyone logs in
 ## Features
 
 - **Links per group.** Each OIDC group gets its own dashboard. Someone in several groups gets one merged page.
-- **Search.** Type to filter your links. `/` jumps to the search box and Enter opens the first match.
+- **Search.** Type to filter your links. `/` jumps to the search box and Enter opens the first match. Start with `>` for commands instead.
 - **Search inside your apps.** Opt in per app and the same box also finds films in Jellyfin, photos in Immich, recipes in Mealie, documents in Paperless and devices in Home Assistant. Results link straight to the item. Search only reads; it never changes anything in your apps.
-- **Your own keys.** People can search Home Assistant, Immich, Mealie and Paperless with their own API key, so they find what their account can see. Keys stay encrypted in their browser; the server stores nothing.
+- **Your own keys.** People can search Home Assistant, Immich, Mealie and Paperless with their own API key, set with a command in the search box, so they find what their account can see. Keys stay encrypted in their browser; the server stores nothing.
 - **Request what's missing.** With Seerr opted in, search also lists matching films and shows that aren't in your library yet. One click opens the title in Seerr to request it.
 - **Icons by name.** Use any name from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons), or a URL. The server fetches and caches them.
 - **Backgrounds.** Keep the glow, or pick hills under a sky that follows the time of day, your own photos, or an Immich album.
@@ -116,7 +116,7 @@ See [config.example.toml](config.example.toml) for every field, which token each
 
 #### Your own keys
 
-For Home Assistant, Immich, Mealie and Paperless, people can use their own API key instead of the shared one: the key button at the end of the search box opens a page listing their apps. A key is tried in the app before it's saved, and from then on that person's searches use it.
+For Home Assistant, Immich, Mealie and Paperless, people can use their own API key instead of the shared one. Type `>` in the search box for commands and choose "Manage your keys" (or type the app's name, e.g. `> immich`), then pick "Use your own … key" and paste the key into the box. A key is tried in the app before it's saved, and from then on that person's searches use it. The same list replaces or removes a key.
 
 There's no database: keys are kept in an encrypted cookie in that browser, tied to the person's login, for about a year after their last visit. On another device they add them again. Changing `HOMENCLATURE_SESSION_SECRET` clears everyone's keys, and searches go back to the shared token. Jellyfin (only admins make API keys) and Seerr (one admin key) always use the shared token.
 

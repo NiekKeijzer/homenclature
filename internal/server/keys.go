@@ -114,41 +114,87 @@ func (a *app) keysPage(w http.ResponseWriter, r *http.Request) {
 	a.renderKeys(w, s, a.keyApps(s, a.readKeys(r, s)), http.StatusOK)
 }
 
-// saveKey saves or removes the user's own key for an app. A key is only
-// saved if the app accepts it.
+// saveKey handles the forms on /keys.
 func (a *app) saveKey(w http.ResponseWriter, r *http.Request) {
 	s, ok := a.keysSession(w, r)
 	if !ok {
 		return
 	}
-	keys := maps.Clone(a.readKeys(r, s))
-	if keys == nil {
-		keys = map[string]string{}
-	}
+	keys := a.keysToChange(r, s)
 	apps := a.keyApps(s, keys)
-	i := slices.IndexFunc(apps, func(k keyApp) bool { return k.Key == r.PostFormValue("app") })
-	if i < 0 {
-		http.Error(w, "Unknown app.", http.StatusBadRequest)
+	i, failed := a.changeKey(r, apps, keys)
+	switch {
+	case i < 0:
+		http.Error(w, "Unknown app or action.", http.StatusBadRequest)
+	case failed != "":
+		apps[i].Error = failed
+		a.renderKeys(w, s, apps, http.StatusUnprocessableEntity)
+	default:
+		a.setCookie(w, keysCookie, personalKeys{s.Sub, keys}, keysTTL)
+		http.Redirect(w, r, "/keys#app-"+apps[i].Key, http.StatusSeeOther) // back at the app's form
+	}
+}
+
+// commandKey runs a key command from the search pill. It answers with the
+// command list, updated, or with why the key wasn't saved, as text.
+func (a *app) commandKey(w http.ResponseWriter, r *http.Request) {
+	var s session
+	if !a.readCookie(r, sessionCookie, &s) || s.Sub == "" {
+		http.Error(w, "Log in again to change your keys.", http.StatusUnauthorized)
 		return
+	}
+	keys := a.keysToChange(r, s)
+	apps := a.keyApps(s, keys)
+	i, failed := a.changeKey(r, apps, keys)
+	switch {
+	case i < 0:
+		http.Error(w, "Unknown app or action.", http.StatusBadRequest)
+		return
+	case failed != "":
+		http.Error(w, failed, http.StatusUnprocessableEntity)
+		return
+	}
+	a.setCookie(w, keysCookie, personalKeys{s.Sub, keys}, keysTTL)
+	title := apps[i].Link.Title
+	list := commandList{a.commands(s, keys), title + " now uses your key."}
+	if r.PostFormValue("action") == "remove" {
+		list.Message = title + " uses the shared key again."
+	}
+	if err := pageTmpl.ExecuteTemplate(w, "commands.html", list); err != nil {
+		log.Printf("render commands: %v", err)
+	}
+}
+
+// keysToChange returns a copy of the user's keys.
+func (a *app) keysToChange(r *http.Request, s session) map[string]string {
+	if keys := maps.Clone(a.readKeys(r, s)); keys != nil {
+		return keys
+	}
+	return map[string]string{}
+}
+
+// changeKey applies a posted key form (app, action, key) to keys: save the
+// key if the app accepts it, or remove it. It returns which of apps the form
+// is for, -1 if it's invalid, and why the key wasn't saved ("" if it was).
+func (a *app) changeKey(r *http.Request, apps []keyApp, keys map[string]string) (i int, failed string) {
+	i = slices.IndexFunc(apps, func(k keyApp) bool { return k.Key == r.PostFormValue("app") })
+	if i < 0 {
+		return -1, ""
 	}
 	l := apps[i].Link
 	switch r.PostFormValue("action") {
 	case "save":
 		key := strings.TrimSpace(r.PostFormValue("key"))
-		if msg := a.checkKey(r.Context(), l, key, keys); msg != "" {
-			apps[i].Error = msg
-			a.renderKeys(w, s, apps, http.StatusUnprocessableEntity)
-			return
+		if failed := a.checkKey(r.Context(), l, key, keys); failed != "" {
+			return i, failed
 		}
 		keys[l.URL] = key
 	case "remove":
 		delete(keys, l.URL)
 	default:
-		http.Error(w, "Unknown action.", http.StatusBadRequest)
-		return
+		return -1, ""
 	}
-	a.setCookie(w, keysCookie, personalKeys{s.Sub, keys}, keysTTL)
-	http.Redirect(w, r, "/keys#app-"+apps[i].Key, http.StatusSeeOther) // back at the app's form
+	return i, ""
 }
 
 // checkKey returns why key can't be saved for l, or "" if it can: it must

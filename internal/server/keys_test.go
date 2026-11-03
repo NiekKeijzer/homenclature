@@ -77,7 +77,11 @@ func keysFor(a *app, sub string, keys map[string]string, ttl time.Duration) *htt
 }
 
 func postKey(a *app, form url.Values, cookies ...*http.Cookie) *http.Response {
-	req := httptest.NewRequest(http.MethodPost, "/keys", strings.NewReader(form.Encode()))
+	return post(a, "/keys", form, cookies...)
+}
+
+func post(a *app, path string, form url.Values, cookies ...*http.Cookie) *http.Response {
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for _, c := range cookies {
 		req.AddCookie(c)
@@ -255,18 +259,6 @@ func TestRenewKeys(t *testing.T) {
 			keys := savedKeys(rec.Result())
 			if renewed := keys != nil && keys.MaxAge == int(keysTTL.Seconds()); renewed != tt.want {
 				t.Errorf("renewed: %t, want %t", renewed, tt.want)
-			}
-		})
-	}
-}
-
-func TestPageKeysButton(t *testing.T) {
-	a, _ := newKeysApp(t)
-	for group, want := range map[string]bool{"parents": true, "media": false, "kids": false} {
-		t.Run(group, func(t *testing.T) {
-			html := body(t, get(a, "/", login(a, group)))
-			if got := strings.Contains(html, `href="/keys"`); got != want {
-				t.Errorf("key button shown: %t, want %t", got, want)
 			}
 		})
 	}

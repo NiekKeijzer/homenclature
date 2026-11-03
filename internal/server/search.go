@@ -124,7 +124,8 @@ func (a *app) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var data struct{ Apps []appResults }
-	if q := strings.TrimSpace(r.URL.Query().Get("q")); utf8.RuneCountInString(q) >= minSearchRunes {
+	// ">" starts a command (commands.go), not a search.
+	if q := strings.TrimSpace(r.URL.Query().Get("q")); !strings.HasPrefix(q, ">") && utf8.RuneCountInString(q) >= minSearchRunes {
 		data.Apps = a.searchApps(r.Context(), s.Groups, a.readKeys(r, s), q)
 	}
 	if err := pageTmpl.ExecuteTemplate(w, "results.html", data); err != nil {

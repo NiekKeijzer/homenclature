@@ -1,0 +1,23 @@
+{{/* The command list, shown while the search starts with ">" and filtered
+     in the browser. Key commands answer with it again, updated. */}}
+<section id="commands" class="panel glass commands" aria-label="Commands">
+  <h2>Commands</h2>
+  <p class="command-note" role="status">{{.Message}}</p>
+  <div class="results">
+    {{range .Items}}
+    <button type="button" class="result command"
+            {{- with .Group}} data-group="{{.}}"{{end}}
+            {{- with .Opens}} data-opens="{{.}}"{{end}}
+            {{- if .Key}} data-key="{{.Key}}" data-action="{{.Action}}" data-name="{{.App}}" data-help="{{.Help}}"{{end}}>
+      <span class="icon" aria-hidden="true">
+        {{- if .App}}{{initial .App}}{{with .Icon}}<img src="{{iconURL .}}" alt="" onerror="this.remove()">{{end}}
+        {{- else}}<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L20 3M16.5 6.5l2.5 2.5M14 9l2 2"/></svg>{{end -}}
+      </span>
+      <span class="text">
+        <span class="title">{{.Title}}</span>
+        <span class="description">{{.Detail}}</span>
+      </span>
+    </button>
+    {{end}}
+  </div>
+</section>
