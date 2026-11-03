@@ -24,6 +24,7 @@ HOMENCLATURE_OIDC_ISSUER = "http://localhost:8080/default"
 HOMENCLATURE_OIDC_CLIENT_ID = "homenclature"
 HOMENCLATURE_OIDC_CLIENT_SECRET = "dev"
 HOMENCLATURE_SESSION_SECRET = "dev-only-session-secret-not-for-production"
+HOMENCLATURE_BACKGROUND="landscape"
 # Search tokens for config.example.toml: your own if exported, else "dev"
 # (the example's apps don't exist, so their searches fail: logged, not shown).
 # Task env beats the shell, hence get_env.

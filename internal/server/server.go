@@ -27,6 +27,7 @@ type app struct {
 	secure    bool        // set the Secure flag on cookies (HTTPS)
 	icons     *iconProxy
 	providers map[string]search.Provider // by searchKey
+	bg        background
 	oauth     *oauth2.Config
 	verifier  *oidc.IDTokenVerifier
 }
@@ -56,6 +57,9 @@ func Run() error {
 	}
 	if a.providers, err = newProviders(cfg); err != nil {
 		return fmt.Errorf("search: %w", err)
+	}
+	if a.bg, err = newBackground(cfg); err != nil {
+		return fmt.Errorf("background: %w", err)
 	}
 	if err := a.setupOIDC(context.Background(), e); err != nil {
 		return fmt.Errorf("oidc: %w", err)

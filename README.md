@@ -10,6 +10,7 @@ A family-first start page for the self-hosted home: one calm, glass-styled place
 
 ![Homenclature in dark mode, signed in as a parent: Media cards on top, with Home and Admin links side by side below](docs/screenshots/dashboard.png)
 ![Searching for "garden": chips per app above results from Jellyfin, Seerr (titles to request), Immich and Home Assistant](docs/screenshots/search.png)
+![The landscape background at dusk: dark hills under a rose and violet sky, seen through the glass panels](docs/screenshots/landscape.png)
 
 ## Why
 
@@ -24,6 +25,7 @@ Homenclature shows each person only the links for their groups. Everyone logs in
 - **Search inside your apps.** Opt in per app and the same box also finds films in Jellyfin, photos in Immich, recipes in Mealie, documents in Paperless and devices in Home Assistant. Results link straight to the item. Search only reads; it never changes anything in your apps.
 - **Request what's missing.** With Seerr opted in, search also lists matching films and shows that aren't in your library yet. One click opens the title in Seerr to request it.
 - **Icons by name.** Use any name from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons), or a URL. The server fetches and caches them.
+- **Backgrounds.** Keep the glow, or pick hills under a sky that follows the time of day, your own photos, or an Immich album.
 - **Light and dark.** Follows the system, and fits phones edge to edge.
 - **Small.** A single Go binary in a ~5 MB distroless image for amd64 and arm64.
 
@@ -38,6 +40,7 @@ services:
       - "8000:8000"
     volumes:
       - ./config.toml:/config/config.toml:ro
+      # - ./backgrounds:/backgrounds:ro # your photos, for HOMENCLATURE_BACKGROUND=folder
     environment:
       HOMENCLATURE_URL: https://home.example.com
       HOMENCLATURE_OIDC_ISSUER: https://auth.example.com/application/o/homenclature/
@@ -58,6 +61,10 @@ Image tags: `latest` and versions like `0.1.0` and `0.1` for releases, `edge` fo
 | `HOMENCLATURE_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET` | Required. Your OIDC client. |
 | `HOMENCLATURE_SESSION_SECRET` | Required, at least 32 characters. Encrypts the login cookie (valid for 24 hours). |
 | `HOMENCLATURE_DEFAULT_DASHBOARD` | Dashboard for people in none of the groups. Unset: they see no links. |
+| `HOMENCLATURE_BACKGROUND` | `default`, `landscape`, `folder` or `immich`. See Background below. |
+| `HOMENCLATURE_BACKGROUND_INTERVAL` | Time between photos. Default `10m`, at least `1m`. |
+| `HOMENCLATURE_BACKGROUND_DIR` | Folder with photos for `folder`. Default `/backgrounds` in Docker. |
+| `HOMENCLATURE_BACKGROUND_IMMICH_ALBUM` | Album ID for `immich`. |
 | `HOMENCLATURE_CONFIG` | Path to the config file. Default `/config/config.toml` in Docker. |
 | `HOMENCLATURE_LISTEN` | Listen address. Default `:8000`. |
 | Your app tokens | For search inside apps: one env var per app, named in the config (`token_env`). |
@@ -105,6 +112,17 @@ Types: `home-assistant`, `immich`, `jellyfin`, `mealie`, `paperless` and `seerr`
 Searches run with that token, so results show what the token can see, to anyone with the link on their page. Give each group its own token where that matters (e.g. a kids' Jellyfin user).
 
 See [config.example.toml](config.example.toml) for every field, which token each app needs, and how pages merge.
+
+### Background
+
+`HOMENCLATURE_BACKGROUND` sets the background for everyone:
+
+- `default`: the glow.
+- `landscape`: hills under a sky that follows the time of day, in soft colours in light mode and deep ones in dark mode.
+- `folder`: your own photos (JPEG, PNG, WebP or AVIF), from a folder you mount at `/backgrounds`. The container doesn't run as root, so the files must be readable by everyone.
+- `immich`: photos from an Immich album. Set `HOMENCLATURE_BACKGROUND_IMMICH_ALBUM` to the album's ID, the last part of its URL. It uses the key of the Immich link with search in your config (the first, if there are several), so that key's user must be able to see the album.
+
+Photos show in random order, each once before any repeats, and change every 10 minutes (`HOMENCLATURE_BACKGROUND_INTERVAL`, e.g. `30m`).
 
 ## Develop
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-background="{{.Background}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  {{if eq .Background "landscape"}}{{template "landscape.html"}}{{end}}
+  {{with .PhotoInterval}}<div class="backdrop slideshow" data-interval="{{.}}" aria-hidden="true"></div>{{end}}
   <main>
     <header class="hero">
       <p class="clock" aria-hidden="true"></p>

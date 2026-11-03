@@ -14,7 +14,7 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 
 ## Decisions
 
-- Backend: Go (version in `mise.toml`). Single binary. Keep Go code out of the repo root: `cmd/homenclature` (main), `internal/server` (HTTP, auth, icons; templates in `internal/server/web`), `internal/config`.
+- Backend: Go (version in `mise.toml`). Single binary. Keep Go code out of the repo root: `cmd/homenclature` (main), `internal/server` (HTTP, auth, icons, backgrounds; templates in `internal/server/web`), `internal/config`.
 - Frontend: Go `html/template` + HTMX + plain CSS, embedded with `go:embed`. HTMX and the Sora font come from npm (`package.json`); `mise run assets` copies them into `web/static/lib` (gitignored), so they're still self-hosted (no CDN). The build fails until that has run. Glass look via `backdrop-filter`.
 - Auth: OIDC. The prod IdP is Authentik, which sends group names in the `groups` claim.
 - Config: the TOML file holds only dashboards (parsed with `BurntSushi/toml`). App settings (OIDC, server) and secrets come from env vars prefixed `HOMENCLATURE_`. No database, no persistent state.
@@ -24,6 +24,7 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 - Sessions: AES-GCM encrypted cookie (stdlib), key from `HOMENCLATURE_SESSION_SECRET`, valid for 24h. No logout button.
 - Page (look "D: search first", see the mockups canvas): a clock with the date and greeting (first name), computed in the browser; a search pill that filters links client-side (`/` focuses, ↑/↓ select, Enter opens, Tab cycles the app chips, Esc clears); while it's focused or has a query the clock shrinks beside the date, animated FLIP-style in `app.js`; sections as glass panels (cards sections get a full row; neighbouring list sections share a row when there's room). Dark with glow blobs by default, a pastel light version when the system is light. Sora (OFL, `@fontsource-variable/sora`, served from `web/static/lib`) for the clock and headings, system fonts otherwise. JS is in `web/static/app.js`. HTMX 2 (`htmx.org`) is served from `web/static/lib/htmx.min.js` and only loaded when the user can search an app.
 - Search inside apps (`internal/search`, `internal/server/search.go`): opt in per link with `search = { type, token_env, api_url?, limit?, ... }`; types home-assistant (`domains`), immich, jellyfin (`types`, `seerr_url`), mealie, paperless, seerr. Seerr lists matching films and shows, skipping available and blocklisted ones, and links to them in Seerr, where people request as themselves; its posters come from TMDB's image CDN, without the key. The token comes from the env var named by `token_env`; unset is a startup error. Read-only: results deep-link into the app. After 2+ characters and a 300ms pause, HTMX loads `/search`: one glass section per app below the links (Immich as a photo grid), with chips (swapped out of band) to filter by app, and a keyboard hint bar. Only apps on the user's dashboard are searched, in parallel with a 3s timeout, using the configured token. Apps with no results are hidden, and so are apps whose search failed (logged); Jellyfin's section ends with a link to its own search, plus one to Seerr's search (`seerr_url`) for users without Seerr search on their dashboard (decided in `internal/server/search.go`). Thumbnails go through `/search/thumb/{key}/{id}`, with the ID validated per app.
+- Background (`internal/server/background.go`): one for everyone, set by `HOMENCLATURE_BACKGROUND`. `default`: the blobs. `landscape`: an inline SVG (`web/landscape.html`) of sky, sun or moon and hills; `app.js` blends colour keyframes by the visitor's local time (a pastel set in light mode, a deep set in dark mode) and moves the sun by day and the moon by night along a low arc at fixed hours, so it glows through the panels rather than behind the clock. `folder`: photos in `HOMENCLATURE_BACKGROUND_DIR` (top level only; jpg, png, webp, avif; no dot files). `immich`: an album's previews, using the first Immich link with search in file order (its API URL and token, so no extra secret). Photos come from `/background` (logged in, `no-store`) in a shuffled round, each once before any repeats. The page loads one on open and crossfades to the next every `HOMENCLATURE_BACKGROUND_INTERVAL`, under a scrim in `--bg`. A photo that fails keeps the current one; the blobs show until the first loads.
 
 ## Env vars
 
@@ -35,6 +36,10 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 | `HOMENCLATURE_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET` | required |
 | `HOMENCLATURE_SESSION_SECRET` | required, at least 32 characters |
 | `HOMENCLATURE_DEFAULT_DASHBOARD` | unset |
+| `HOMENCLATURE_BACKGROUND` | `default`; or `landscape`, `folder`, `immich` |
+| `HOMENCLATURE_BACKGROUND_INTERVAL` | `10m`, at least `1m`; time between photos |
+| `HOMENCLATURE_BACKGROUND_DIR` | `backgrounds` (Docker: `/backgrounds`); for `folder` |
+| `HOMENCLATURE_BACKGROUND_IMMICH_ALBUM` | required for `immich`: the album ID |
 | app tokens for search | named per link by `token_env` in the config |
 
 `mise run dev` sets dev values for all of these.
