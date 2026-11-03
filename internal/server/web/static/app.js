@@ -140,7 +140,9 @@ if (search) {
     });
   }
 
-  const updateCompact = () => setCompact(pill.matches(":focus-within") || search.value.trim() !== "");
+  // Not for the keys link: it leaves the page.
+  const updateCompact = () =>
+    setCompact(pill.matches(":focus-within:not(:has(.keys:focus))") || search.value.trim() !== "");
   pill.addEventListener("focusin", updateCompact);
   pill.addEventListener("focusout", (e) => {
     if (!pill.contains(e.relatedTarget)) setCompact(search.value.trim() !== "");
@@ -230,7 +232,7 @@ if (search) {
     if (e.target.closest(".clear")) {
       search.focus(); // first, so the clock doesn't grow and shrink again
       clear();
-    } else if (e.target !== search) {
+    } else if (e.target !== search && !e.target.closest(".keys")) {
       search.focus();
     }
   });

@@ -24,6 +24,9 @@ const (
 	minSearchRunes = 2
 )
 
+// searchClient makes the requests to apps, with shared and personal keys.
+var searchClient = &http.Client{Timeout: 10 * time.Second}
+
 // searchKey identifies a link with search enabled, in URLs and a.providers.
 func searchKey(l config.Link) string {
 	s := *l.Search
@@ -33,7 +36,6 @@ func searchKey(l config.Link) string {
 }
 
 func newProviders(cfg *config.Config) (map[string]search.Provider, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
 	providers := map[string]search.Provider{}
 	for _, d := range cfg.Dashboards {
 		for _, s := range d.Sections {
@@ -41,7 +43,7 @@ func newProviders(cfg *config.Config) (map[string]search.Provider, error) {
 				if l.Search == nil {
 					continue
 				}
-				p, err := search.New(l, client)
+				p, err := search.New(l, searchClient)
 				if err != nil {
 					return nil, err
 				}
@@ -123,16 +125,17 @@ func (a *app) search(w http.ResponseWriter, r *http.Request) {
 	}
 	var data struct{ Apps []appResults }
 	if q := strings.TrimSpace(r.URL.Query().Get("q")); utf8.RuneCountInString(q) >= minSearchRunes {
-		data.Apps = a.searchApps(r.Context(), s.Groups, q)
+		data.Apps = a.searchApps(r.Context(), s.Groups, a.readKeys(r, s), q)
 	}
 	if err := pageTmpl.ExecuteTemplate(w, "results.html", data); err != nil {
 		log.Printf("render results: %v", err)
 	}
 }
 
-// searchApps searches the user's apps in parallel. Apps without results are
-// left out, and so are apps that failed (the error is logged).
-func (a *app) searchApps(ctx context.Context, groups []string, q string) []appResults {
+// searchApps searches the user's apps in parallel, with their own keys where
+// they set one. Apps without results are left out, and so are apps that
+// failed (the error is logged).
+func (a *app) searchApps(ctx context.Context, groups []string, keys map[string]string, q string) []appResults {
 	apps := a.searchable(groups)
 	var wg sync.WaitGroup
 	for i := range apps {
@@ -140,7 +143,7 @@ func (a *app) searchApps(ctx context.Context, groups []string, q string) []appRe
 		wg.Go(func() {
 			ctx, cancel := context.WithTimeout(ctx, searchTimeout)
 			defer cancel()
-			results, err := a.providers[res.Key].Search(ctx, q)
+			results, err := a.provider(res.Link, keys).Search(ctx, q)
 			if err != nil {
 				log.Printf("search %s: %v", res.Link.Title, err)
 				return
@@ -161,16 +164,21 @@ func (a *app) searchApps(ctx context.Context, groups []string, q string) []appRe
 	return slices.DeleteFunc(apps, func(r appResults) bool { return len(r.Items) == 0 })
 }
 
-// searchThumb proxies a result thumbnail, using the app's token. Only apps on
-// the user's dashboard are allowed.
+// searchThumb proxies a result thumbnail, with the same key as the search.
+// Only apps on the user's dashboard are allowed.
 func (a *app) searchThumb(w http.ResponseWriter, r *http.Request) {
 	var s session
-	key := r.PathValue("key")
-	if !a.readCookie(r, sessionCookie, &s) || !slices.ContainsFunc(a.searchable(s.Groups), func(r appResults) bool { return r.Key == key }) {
+	if !a.readCookie(r, sessionCookie, &s) {
 		http.NotFound(w, r)
 		return
 	}
-	img, err := a.providers[key].Thumbnail(r.Context(), r.PathValue("id"))
+	apps := a.searchable(s.Groups)
+	i := slices.IndexFunc(apps, func(app appResults) bool { return app.Key == r.PathValue("key") })
+	if i < 0 {
+		http.NotFound(w, r)
+		return
+	}
+	img, err := a.provider(apps[i].Link, a.readKeys(r, s)).Thumbnail(r.Context(), r.PathValue("id"))
 	if err != nil {
 		if !errors.Is(err, search.ErrInvalidID) {
 			log.Printf("search thumbnail: %v", err)

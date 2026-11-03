@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en" data-background="{{.Background}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Your keys</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  {{if eq .Background "landscape"}}{{template "landscape.html"}}{{end}}
+  {{with .PhotoInterval}}<div class="backdrop slideshow" data-interval="{{.}}" aria-hidden="true"></div>{{end}}
+  <main>
+    <header class="hero">
+      <p class="clock" aria-hidden="true"></p>
+      <h1 class="greeting" data-name="{{.Name}}">Hello{{with .Name}}, {{.}}{{end}}</h1>
+    </header>
+
+    <section class="panel glass keys-panel">
+      <h2>Your keys</h2>
+      <p class="note">Search an app with your own key to find what your account can see. Without one, search uses the shared key.</p>
+      {{range .Apps}}
+      <form class="key" id="app-{{.Key}}" method="post" action="/keys">
+        <input type="hidden" name="app" value="{{.Key}}">
+        <div class="key-app">
+          <span class="icon" aria-hidden="true">{{initial .Link.Title}}{{with .Link.Icon}}<img src="{{iconURL .}}" alt="" onerror="this.remove()">{{end}}</span>
+          <span class="text">
+            <span class="title">{{.Link.Title}}</span>
+            <span class="description">{{if .Own}}Using your key{{else}}Using the shared key{{end}}</span>
+          </span>
+        </div>
+        <div class="key-field">
+          <input type="password" name="key" required maxlength="512" autocomplete="off" spellcheck="false"
+                 placeholder="{{if .Own}}Paste a new key{{else}}Paste your key{{end}}" aria-label="Your key for {{.Link.Title}}"
+                 {{- if .Error}} autofocus aria-describedby="error-{{.Key}}"{{end}}>
+          <button name="action" value="save">Save</button>
+          {{if .Own}}<button name="action" value="remove" class="remove" formnovalidate>Remove</button>{{end}}
+        </div>
+        {{if .Error}}<p class="key-error" id="error-{{.Key}}" role="alert">{{.Error}}</p>{{end}}
+        <p class="key-help">Make one in {{.Link.Title}}: {{.Help}}</p>
+      </form>
+      {{else}}
+      <p class="note">None of your apps take a key of your own.</p>
+      {{end}}
+      <p class="note">Your keys are kept encrypted in this browser only, for about a year after your last visit. On other devices, add them again.</p>
+    </section>
+    <a class="back" href="/">Back</a>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -20,6 +20,7 @@ const (
 )
 
 type session struct {
+	Sub    string   `json:"sub"` // OIDC subject; empty in sessions from older versions
 	Name   string   `json:"name"`
 	Groups []string `json:"groups"`
 }
@@ -96,6 +97,8 @@ func (a *app) callback(w http.ResponseWriter, r *http.Request) {
 	if f := strings.Fields(claims.Name); len(f) > 0 {
 		name = f[0]
 	}
-	a.setCookie(w, sessionCookie, session{Name: name, Groups: claims.Groups}, sessionTTL)
+	s := session{Sub: idToken.Subject, Name: name, Groups: claims.Groups}
+	a.setCookie(w, sessionCookie, s, sessionTTL)
+	a.renewKeys(w, r, s)
 	http.Redirect(w, r, "/", http.StatusFound)
 }
