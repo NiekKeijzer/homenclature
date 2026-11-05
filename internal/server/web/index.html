@@ -25,12 +25,26 @@
       {{else}}
       <input type="search" placeholder="Search your links" aria-label="Search your links" autocomplete="off" spellcheck="false">
       {{end}}
+      {{if .Commands.Items}}
+      {{/* Asks for a key, in place of the search input: a key typed into the
+           search would be sent to /search. */}}
+      <form class="prompt" method="post" action="/commands/keys">
+        <input type="hidden" name="app">
+        <input type="hidden" name="action" value="save">
+        <span class="prompt-label"></span>
+        <input type="password" name="key" required maxlength="512" autocomplete="off" spellcheck="false">
+      </form>
+      {{end}}
       <kbd class="key-slash" aria-hidden="true">/</kbd>
       <kbd class="key-esc" aria-hidden="true">esc</kbd>
       <button type="button" class="clear" aria-label="Clear search">
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
+    {{if .Commands.Items}}
+    <button type="button" class="command-hint">Type <kbd>&gt;</kbd> for commands</button>
+    {{template "commands.html" .Commands}}
+    {{end}}
     <div id="chips" class="chips"></div>
     {{end}}
 
@@ -62,7 +76,9 @@
       <span><kbd>↑</kbd><kbd>↓</kbd> to move</span>
       <span><kbd>↵</kbd> to open</span>
       <span class="tab-hint"><kbd>tab</kbd> to filter by app</span>
-      <span><kbd>esc</kbd> to clear</span>
+      <span class="esc-clear"><kbd>esc</kbd> to clear</span>
+      <span class="esc-back"><kbd>esc</kbd> to go back</span>
+      {{if .Commands.Items}}<span class="command-key-hint"><kbd>&gt;</kbd> for commands</span>{{end}}
     </p>
   </main>
 

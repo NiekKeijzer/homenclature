@@ -56,7 +56,7 @@ url = "https://recipes.example"
 }
 
 func login(a *app, groups ...string) *http.Cookie {
-	return cookieFor(a, sessionCookie, session{Name: "Test", Groups: groups}, time.Hour)
+	return cookieFor(a, sessionCookie, session{Sub: "test-sub", Name: "Test", Groups: groups}, time.Hour)
 }
 
 func TestSearchRequiresLogin(t *testing.T) {

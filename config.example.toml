@@ -45,6 +45,10 @@
 #   group (e.g. kids), put the link in each group's dashboard with its own
 #   token_env, not in a shared one: merged links keep the first in file order.
 #
+#   People can search home-assistant, immich, mealie and paperless with their
+#   own key instead (type > in the search box for commands). It's kept in their
+#   browser and replaces this token for them only; token_env is still required.
+#
 #   Tokens:
 #     home-assistant  Profile > Security > Long-lived access tokens. Tokens
 #                     can't be read-only: make a non-admin user for this.

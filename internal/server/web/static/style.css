@@ -278,6 +278,95 @@ main {
   outline: 2px solid var(--focus);
 }
 
+/* Commands: ">" in the search shows them in place of links and results. */
+.commands,
+.command-hint,
+.search .prompt,
+.commanding .sections,
+.commanding .app-results,
+.commanding .chips,
+.commanding .command-key-hint {
+  display: none;
+}
+
+.commanding .commands {
+  display: block;
+  flex: none;
+}
+
+/* A command that needs input (a key) asks for it in the pill. Its note says
+   which keys work, so the hint bar goes. */
+.prompting .search > input,
+.prompting .commands .results,
+.prompting .hints {
+  display: none !important;
+}
+
+.prompting .search .prompt {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prompt-label {
+  flex: none;
+  padding: 2px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--tile-hover);
+  border-radius: 999px;
+}
+
+.command-note {
+  margin: 0 12px 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.command-note:empty {
+  display: none;
+}
+
+.command-note.error {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.command {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* While the search is focused and empty. */
+.compact:not(.searching) .command-hint {
+  display: block;
+  align-self: center;
+  margin-top: -16px;
+  padding: 4px 14px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.command-hint kbd {
+  padding: 1px 7px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+}
+
 /* Chips to filter search results by app. On phones they scroll sideways. */
 .chips {
   display: flex;
@@ -695,7 +784,9 @@ main {
   border-radius: 6px;
 }
 
-main:not(:has(.chip)) .tab-hint {
+main:not(:has(.chip)) .tab-hint,
+main:not(.in-group) .esc-back,
+.in-group .esc-clear {
   display: none;
 }
 
@@ -704,6 +795,116 @@ main:not(:has(.chip)) .tab-hint {
   padding: 20px 22px;
   color: var(--muted);
   border-radius: 22px;
+}
+
+/* Your keys (/keys): a form per app. */
+.keys-panel {
+  flex: none;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.keys-panel .note {
+  margin: 0 12px 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.keys-panel .note:last-child {
+  margin: 14px 12px 4px;
+}
+
+.key {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--tile);
+  border-radius: 20px;
+}
+
+.key + .key {
+  margin-top: 8px;
+}
+
+.key-app {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.key-field {
+  display: flex;
+  gap: 8px;
+}
+
+.key-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 16px; /* so iOS doesn't zoom in on focus */
+  color: inherit;
+  background: var(--tile-hover);
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+}
+
+.key-field input::placeholder {
+  color: var(--muted);
+}
+
+.key button {
+  flex: none;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--on-text);
+  background: var(--on);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.key button.remove {
+  color: inherit;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.key-field input:focus-visible,
+.key button:focus-visible,
+.back:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.key-help,
+.key-error {
+  margin: 0 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.key-error {
+  font-weight: 600;
+  color: inherit;
+}
+
+.back {
+  align-self: center;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 999px;
+}
+
+.back:hover {
+  color: var(--text);
+  background: var(--tile);
 }
 
 @media (prefers-reduced-motion: reduce) {
