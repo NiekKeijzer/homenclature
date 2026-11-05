@@ -126,7 +126,7 @@ func (a *app) search(w http.ResponseWriter, r *http.Request) {
 	var data struct{ Apps []appResults }
 	// ">" starts a command (commands.go), not a search.
 	if q := strings.TrimSpace(r.URL.Query().Get("q")); !strings.HasPrefix(q, ">") && utf8.RuneCountInString(q) >= minSearchRunes {
-		data.Apps = a.searchApps(r.Context(), s.Groups, a.readKeys(r, s), q)
+		data.Apps = a.searchApps(r.Context(), s.Groups, a.readKeys(r, s).Keys, q)
 	}
 	if err := pageTmpl.ExecuteTemplate(w, "results.html", data); err != nil {
 		log.Printf("render results: %v", err)
@@ -179,7 +179,7 @@ func (a *app) searchThumb(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	img, err := a.provider(apps[i].Link, a.readKeys(r, s)).Thumbnail(r.Context(), r.PathValue("id"))
+	img, err := a.provider(apps[i].Link, a.readKeys(r, s).Keys).Thumbnail(r.Context(), r.PathValue("id"))
 	if err != nil {
 		if !errors.Is(err, search.ErrInvalidID) {
 			log.Printf("search thumbnail: %v", err)

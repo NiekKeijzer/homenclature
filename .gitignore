@@ -8,3 +8,6 @@ config.homelab.toml
 
 # environment variables
 .env
+
+# personal keys kept on the server by `mise run dev`
+/dev/data/

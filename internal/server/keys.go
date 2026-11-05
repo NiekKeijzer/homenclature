@@ -16,7 +16,9 @@ import (
 
 // Personal keys: people can search an app with their own API key instead of
 // the shared one (token_env). The keys stay in an encrypted cookie in their
-// browser, tied to their OIDC subject; the server stores nothing.
+// browser, tied to their OIDC subject. With HOMENCLATURE_DATA_DIR set, each
+// person can choose to keep them on the server instead, for all their
+// devices (keystore.go).
 
 const (
 	keysCookie   = "homenclature_keys"
@@ -41,22 +43,69 @@ type personalKeys struct {
 	Keys map[string]string `json:"keys"` // by link URL
 }
 
-// readKeys returns the user's own keys by link URL; nil if they have none.
-// Keys of someone else who used this browser are ignored.
-func (a *app) readKeys(r *http.Request, s session) map[string]string {
-	var k personalKeys
-	if s.Sub == "" || !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub {
-		return nil
-	}
-	return k.Keys
+// userKeys are the user's own keys, and where they're kept.
+type userKeys struct {
+	Keys     map[string]string // by link URL; nil if they have none
+	OnServer bool              // in the key store, for all their devices; else in this browser
 }
 
-// renewKeys gives the user's keys a fresh TTL, so they only expire after
-// keysTTL without a login.
-func (a *app) renewKeys(w http.ResponseWriter, r *http.Request, s session) {
-	if keys := a.readKeys(r, s); len(keys) > 0 {
-		a.setCookie(w, keysCookie, personalKeys{s.Sub, keys}, keysTTL)
+// readKeys returns the user's own keys: from the key store if they keep
+// them there, else from this browser. Keys of someone else who used this
+// browser are ignored.
+func (a *app) readKeys(r *http.Request, s session) userKeys {
+	if s.Sub == "" {
+		return userKeys{}
 	}
+	if a.store != nil {
+		if keys, ok := a.store.get(s.Sub); ok {
+			return userKeys{Keys: keys, OnServer: true}
+		}
+	}
+	var k personalKeys
+	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub {
+		return userKeys{}
+	}
+	return userKeys{Keys: k.Keys}
+}
+
+// renewKeys gives the user's keys in this browser a fresh TTL, so they only
+// expire after keysTTL without a login. If they keep their keys on the
+// server, it removes their old ones left in this browser, so those don't
+// come back if they move their keys to another browser.
+func (a *app) renewKeys(w http.ResponseWriter, r *http.Request, s session) {
+	if k := a.readKeys(r, s); !k.OnServer {
+		if len(k.Keys) > 0 {
+			a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys}, keysTTL)
+		}
+		return
+	}
+	var old personalKeys
+	if a.readCookie(r, keysCookie, &old) && old.Sub == s.Sub {
+		a.clearCookie(w, keysCookie)
+	}
+}
+
+// writeKeys saves k where it says. Moved from the other place (wasOnServer
+// differs), it's removed there.
+func (a *app) writeKeys(w http.ResponseWriter, s session, k userKeys, wasOnServer bool) error {
+	if k.OnServer {
+		if err := a.store.put(s.Sub, k.Keys); err != nil {
+			return err
+		}
+		// Keys read from this browser were the user's; with none, a keys
+		// cookie here is someone else's, so it stays.
+		if !wasOnServer && len(k.Keys) > 0 {
+			a.clearCookie(w, keysCookie)
+		}
+		return nil
+	}
+	if wasOnServer {
+		if err := a.store.remove(s.Sub); err != nil {
+			return err
+		}
+	}
+	a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys}, keysTTL)
+	return nil
 }
 
 // provider searches l with the user's own key if they set one, else with
@@ -111,7 +160,8 @@ func (a *app) keysPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	a.renderKeys(w, s, a.keyApps(s, a.readKeys(r, s)), http.StatusOK)
+	k := a.readKeys(r, s)
+	a.renderKeys(w, s, a.keyApps(s, k.Keys), k.OnServer, http.StatusOK)
 }
 
 // saveKey handles the forms on /keys.
@@ -120,18 +170,26 @@ func (a *app) saveKey(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	keys := a.keysToChange(r, s)
-	apps := a.keyApps(s, keys)
-	i, failed := a.changeKey(r, apps, keys)
+	k, wasOnServer := a.keysToChange(r, s)
+	apps := a.keyApps(s, k.Keys)
+	i, failed, ok := a.changeKeys(r, apps, &k)
 	switch {
-	case i < 0:
+	case !ok:
 		http.Error(w, "Unknown app or action.", http.StatusBadRequest)
 	case failed != "":
 		apps[i].Error = failed
-		a.renderKeys(w, s, apps, http.StatusUnprocessableEntity)
+		a.renderKeys(w, s, apps, k.OnServer, http.StatusUnprocessableEntity)
 	default:
-		a.setCookie(w, keysCookie, personalKeys{s.Sub, keys}, keysTTL)
-		http.Redirect(w, r, "/keys#app-"+apps[i].Key, http.StatusSeeOther) // back at the app's form
+		if err := a.writeKeys(w, s, k, wasOnServer); err != nil {
+			log.Printf("keys: save: %v", err)
+			http.Error(w, "Your keys couldn't be saved. Try again later.", http.StatusInternalServerError)
+			return
+		}
+		at := "#where" // back at the form that was sent
+		if i >= 0 {
+			at = "#app-" + apps[i].Key
+		}
+		http.Redirect(w, r, "/keys"+at, http.StatusSeeOther)
 	}
 }
 
@@ -143,58 +201,81 @@ func (a *app) commandKey(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Log in again to change your keys.", http.StatusUnauthorized)
 		return
 	}
-	keys := a.keysToChange(r, s)
-	apps := a.keyApps(s, keys)
-	i, failed := a.changeKey(r, apps, keys)
+	k, wasOnServer := a.keysToChange(r, s)
+	apps := a.keyApps(s, k.Keys)
+	i, failed, ok := a.changeKeys(r, apps, &k)
 	switch {
-	case i < 0:
+	case !ok:
 		http.Error(w, "Unknown app or action.", http.StatusBadRequest)
 		return
 	case failed != "":
 		http.Error(w, failed, http.StatusUnprocessableEntity)
 		return
 	}
-	a.setCookie(w, keysCookie, personalKeys{s.Sub, keys}, keysTTL)
-	title := apps[i].Link.Title
-	list := commandList{a.commands(s, keys), title + " now uses your key."}
-	if r.PostFormValue("action") == "remove" {
-		list.Message = title + " uses the shared key again."
+	if err := a.writeKeys(w, s, k, wasOnServer); err != nil {
+		log.Printf("keys: save: %v", err)
+		http.Error(w, "Your keys couldn't be saved. Try again later.", http.StatusInternalServerError)
+		return
+	}
+	list := commandList{Items: a.commands(s, k)}
+	switch r.PostFormValue("action") {
+	case "save":
+		list.Message = apps[i].Link.Title + " now uses your key."
+	case "remove":
+		list.Message = apps[i].Link.Title + " uses the shared key again."
+	case "server":
+		list.Message = "Your keys are now on all your devices."
+	case "browser":
+		list.Message = "Your keys are now in this browser only."
 	}
 	if err := pageTmpl.ExecuteTemplate(w, "commands.html", list); err != nil {
 		log.Printf("render commands: %v", err)
 	}
 }
 
-// keysToChange returns a copy of the user's keys.
-func (a *app) keysToChange(r *http.Request, s session) map[string]string {
-	if keys := maps.Clone(a.readKeys(r, s)); keys != nil {
-		return keys
+// keysToChange returns a copy of the user's keys, and whether they're on the
+// server now.
+func (a *app) keysToChange(r *http.Request, s session) (userKeys, bool) {
+	k := a.readKeys(r, s)
+	k.Keys = maps.Clone(k.Keys)
+	if k.Keys == nil {
+		k.Keys = map[string]string{}
 	}
-	return map[string]string{}
+	return k, k.OnServer
 }
 
-// changeKey applies a posted key form (app, action, key) to keys: save the
-// key if the app accepts it, or remove it. It returns which of apps the form
-// is for, -1 if it's invalid, and why the key wasn't saved ("" if it was).
-func (a *app) changeKey(r *http.Request, apps []keyApp, keys map[string]string) (i int, failed string) {
-	i = slices.IndexFunc(apps, func(k keyApp) bool { return k.Key == r.PostFormValue("app") })
+// changeKeys applies a posted key form to k: save an app's key if the app
+// accepts it, or remove it (app, action save or remove, key); or keep all
+// keys on the server or in this browser (action server or browser). It
+// returns which of apps the form is for (-1 for none), why the key wasn't
+// saved ("" if it was), and false if the form is invalid.
+func (a *app) changeKeys(r *http.Request, apps []keyApp, k *userKeys) (i int, failed string, ok bool) {
+	switch action := r.PostFormValue("action"); action {
+	case "server", "browser":
+		if a.store == nil || len(apps) == 0 {
+			return -1, "", false
+		}
+		k.OnServer = action == "server"
+		return -1, "", true
+	}
+	i = slices.IndexFunc(apps, func(ka keyApp) bool { return ka.Key == r.PostFormValue("app") })
 	if i < 0 {
-		return -1, ""
+		return -1, "", false
 	}
 	l := apps[i].Link
 	switch r.PostFormValue("action") {
 	case "save":
 		key := strings.TrimSpace(r.PostFormValue("key"))
-		if failed := a.checkKey(r.Context(), l, key, keys); failed != "" {
-			return i, failed
+		if failed := a.checkKey(r.Context(), l, key, k.Keys); failed != "" {
+			return i, failed, true
 		}
-		keys[l.URL] = key
+		k.Keys[l.URL] = key
 	case "remove":
-		delete(keys, l.URL)
+		delete(k.Keys, l.URL)
 	default:
-		return -1, ""
+		return -1, "", false
 	}
-	return i, ""
+	return i, "", true
 }
 
 // checkKey returns why key can't be saved for l, or "" if it can: it must
@@ -222,13 +303,15 @@ func (a *app) checkKey(ctx context.Context, l config.Link, key string, keys map[
 	return ""
 }
 
-func (a *app) renderKeys(w http.ResponseWriter, s session, apps []keyApp, status int) {
+func (a *app) renderKeys(w http.ResponseWriter, s session, apps []keyApp, onServer bool, status int) {
 	data := struct {
 		Name          string
 		Apps          []keyApp
+		OnServer      bool // the keys are kept on the server
+		CanMove       bool // the user can choose where their keys are kept
 		Background    string
 		PhotoInterval int
-	}{s.Name, apps, a.bg.mode, a.bg.photoInterval()}
+	}{s.Name, apps, onServer, a.store != nil && len(apps) > 0, a.bg.mode, a.bg.photoInterval()}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	if err := pageTmpl.ExecuteTemplate(w, "keys.html", data); err != nil {

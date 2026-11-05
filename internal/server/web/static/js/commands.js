@@ -63,7 +63,12 @@ const note = (text, error) => {
 function run(command) {
   const { opens, key, action, name, help } = command.dataset;
   if (opens) return open(opens);
-  if (action === "remove") return send(new URLSearchParams({ app: key, action }), command.dataset.group);
+  if (action !== "save") {
+    // Remove a key, or move all keys: nothing to ask.
+    const body = new URLSearchParams({ action });
+    if (key) body.set("app", key);
+    return send(body, command.dataset.group);
+  }
   prompt.elements.app.value = key;
   prompt.dataset.name = name;
   prompt.dataset.group = command.dataset.group;

@@ -20,8 +20,9 @@ func TestPageCommands(t *testing.T) {
 		// Key commands are grouped under "Manage your keys". The /keys page
 		// isn't linked: commands stay on the page.
 		"shared key": {"parents", nil,
-			[]string{`id="commands"`, `data-opens="keys"`, "Manage your keys", `data-group="keys" data-key="` + appKey(a, "parents") + `" data-action="save"`, "Use your own Paperless key", `class="command-hint"`, `class="prompt"`},
-			[]string{"Remove your Paperless key", "Jellyfin key", `href="/keys"`}},
+			[]string{`id="commands"`, `data-opens="keys"`, "Manage your keys", `data-group="keys" data-action="save" data-key="` + appKey(a, "parents") + `"`, "Use your own Paperless key", `class="command-hint"`, `class="prompt"`},
+			// Without a key store, keys can't be moved.
+			[]string{"Remove your Paperless key", "Jellyfin key", `href="/keys"`, "Keep your keys"}},
 		"own key": {"parents", []*http.Cookie{mine},
 			[]string{"Replace your Paperless key", "Remove your Paperless key"},
 			[]string{"Use your own Paperless key"}},
