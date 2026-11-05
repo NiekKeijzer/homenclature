@@ -1,4 +1,5 @@
-// Package server serves the homepage: OIDC login, the links page and icons.
+// Package server serves the homepage: OIDC login, the links page, icons and
+// search inside apps.
 package server
 
 import (
@@ -15,17 +16,19 @@ import (
 	"time"
 
 	"github.com/NiekKeijzer/homenclature/internal/config"
+	"github.com/NiekKeijzer/homenclature/internal/search"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 )
 
 type app struct {
-	cfg      *config.Config
-	aead     cipher.AEAD // encrypts cookies
-	secure   bool        // set the Secure flag on cookies (HTTPS)
-	icons    *iconProxy
-	oauth    *oauth2.Config
-	verifier *oidc.IDTokenVerifier
+	cfg       *config.Config
+	aead      cipher.AEAD // encrypts cookies
+	secure    bool        // set the Secure flag on cookies (HTTPS)
+	icons     *iconProxy
+	providers map[string]search.Provider // by searchKey
+	oauth     *oauth2.Config
+	verifier  *oidc.IDTokenVerifier
 }
 
 type env struct {
@@ -50,6 +53,9 @@ func Run() error {
 		aead:   newAEAD(e.sessionSecret),
 		secure: strings.HasPrefix(e.baseURL, "https://"),
 		icons:  newIconProxy(cfg),
+	}
+	if a.providers, err = newProviders(cfg); err != nil {
+		return fmt.Errorf("search: %w", err)
 	}
 	if err := a.setupOIDC(context.Background(), e); err != nil {
 		return fmt.Errorf("oidc: %w", err)

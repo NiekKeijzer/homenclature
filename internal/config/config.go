@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -34,10 +35,37 @@ type Section struct {
 }
 
 type Link struct {
-	Title       string `toml:"title"`
-	URL         string `toml:"url"`
-	Icon        string `toml:"icon"` // dashboard-icons name or URL
-	Description string `toml:"description"`
+	Title       string  `toml:"title"`
+	URL         string  `toml:"url"`
+	Icon        string  `toml:"icon"` // dashboard-icons name or URL
+	Description string  `toml:"description"`
+	Search      *Search `toml:"search"` // nil: the app isn't searched
+}
+
+// SearchTypes are the apps that can be searched.
+var SearchTypes = []string{"home-assistant", "immich", "jellyfin", "mealie", "paperless", "seerr"}
+
+// JellyfinTypes are the item types a Jellyfin search can include.
+var JellyfinTypes = []string{
+	"Audio", "AudioBook", "Book", "BoxSet", "Episode", "Movie", "MusicAlbum",
+	"MusicArtist", "MusicVideo", "Playlist", "Season", "Series", "Video",
+}
+
+// MaxSearchLimit caps Search.Limit.
+const MaxSearchLimit = 50
+
+// Search opts a link in to searching inside the app, through its API.
+type Search struct {
+	Type     string `toml:"type"`      // one of SearchTypes
+	TokenEnv string `toml:"token_env"` // env var holding the API token
+	APIURL   string `toml:"api_url"`   // where the server reaches the API; default: the link URL
+	Limit    int    `toml:"limit"`     // results shown; 0: the app's default
+
+	Types    []string `toml:"types"`     // jellyfin: item types (JellyfinTypes); empty: a default set
+	SeerrURL string   `toml:"seerr_url"` // jellyfin: also link to a Seerr search
+	Domains  []string `toml:"domains"`   // home-assistant: entity domains, e.g. "light"; empty: all
+
+	Token string `toml:"-"` // read from TokenEnv by Load
 }
 
 // Load reads and validates a config file, plus DefaultDashboardEnv. Unknown
@@ -90,10 +118,57 @@ func (c *Config) validate() error {
 				if u, err := url.Parse(l.URL); err != nil || u.Scheme == "" {
 					errs = append(errs, fmt.Errorf("%s: url must be absolute, got %q", at, l.URL))
 				}
+				if l.Search != nil {
+					errs = append(errs, l.Search.load(at+".search")...)
+				}
 			}
 		}
 	}
 	return errors.Join(errs...)
+}
+
+// load validates s and reads its token from the environment.
+func (s *Search) load(at string) []error {
+	var errs []error
+	if !slices.Contains(SearchTypes, s.Type) {
+		errs = append(errs, fmt.Errorf("%s: type must be one of %s, got %q", at, strings.Join(SearchTypes, ", "), s.Type))
+	}
+	if s.TokenEnv == "" {
+		errs = append(errs, fmt.Errorf("%s: token_env is required", at))
+	} else if s.Token = os.Getenv(s.TokenEnv); s.Token == "" {
+		errs = append(errs, fmt.Errorf("%s: env var %s (token_env) is not set", at, s.TokenEnv))
+	}
+	for _, u := range []struct{ key, value string }{{"api_url", s.APIURL}, {"seerr_url", s.SeerrURL}} {
+		if u.value != "" && !isHTTPURL(u.value) {
+			errs = append(errs, fmt.Errorf("%s: %s must be an http(s) URL, got %q", at, u.key, u.value))
+		}
+	}
+	if s.Limit < 0 || s.Limit > MaxSearchLimit {
+		errs = append(errs, fmt.Errorf("%s: limit must be between 1 and %d, got %d", at, MaxSearchLimit, s.Limit))
+	}
+	for _, t := range s.Types {
+		if !slices.Contains(JellyfinTypes, t) {
+			errs = append(errs, fmt.Errorf("%s: types must be from %s, got %q", at, strings.Join(JellyfinTypes, ", "), t))
+		}
+	}
+	for _, o := range []struct {
+		key, onlyFor string
+		set          bool
+	}{
+		{"types", "jellyfin", len(s.Types) > 0},
+		{"seerr_url", "jellyfin", s.SeerrURL != ""},
+		{"domains", "home-assistant", len(s.Domains) > 0},
+	} {
+		if o.set && s.Type != o.onlyFor {
+			errs = append(errs, fmt.Errorf("%s: %s only applies to type %s", at, o.key, o.onlyFor))
+		}
+	}
+	return errs
+}
+
+func isHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	return err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https")
 }
 
 // Sections returns what a user in the given groups sees: their group

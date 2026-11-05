@@ -24,7 +24,11 @@ func newTestApp(t *testing.T, configTOML string) *app {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &app{cfg: cfg, aead: newAEAD("test-secret-test-secret-test-secret"), icons: newIconProxy(cfg)}
+	providers, err := newProviders(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &app{cfg: cfg, aead: newAEAD("test-secret-test-secret-test-secret"), icons: newIconProxy(cfg), providers: providers}
 }
 
 // cookieFor returns an encrypted cookie as the app would set it.
@@ -63,6 +67,9 @@ title = "Home"`)
 }
 
 func TestPageShowsLinksForGroups(t *testing.T) {
+	for _, app := range []string{"HOME_ASSISTANT", "IMMICH", "JELLYFIN", "MEALIE", "PAPERLESS", "SEERR"} {
+		t.Setenv("HOMENCLATURE_"+app+"_TOKEN", "test")
+	}
 	example, err := os.ReadFile("../../config.example.toml")
 	if err != nil {
 		t.Fatal(err)
@@ -78,6 +85,7 @@ func TestPageShowsLinksForGroups(t *testing.T) {
 	for _, want := range []string{
 		"Hello, Niek", "Paperless", "Proxmox", "Jellyfin", `src="` + iconURL("jellyfin") + `"`,
 		`class="search glass"`, `class="panel glass list"`, `class="panel glass cards"`,
+		`hx-get="/search"`, "/static/htmx.min.js",
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("page is missing %q", want)
@@ -85,6 +93,19 @@ func TestPageShowsLinksForGroups(t *testing.T) {
 	}
 	if strings.Contains(html, "Audiobookshelf") {
 		t.Error("page shows the kids-only link Audiobookshelf")
+	}
+}
+
+func TestPageWithoutSearchableApps(t *testing.T) {
+	a := newTestApp(t, `
+[[dashboards.family.sections]]
+title = "Home"
+[[dashboards.family.sections.links]]
+title = "Wiki"
+url = "https://wiki.example"`)
+	html := body(t, get(a, "/", cookieFor(a, sessionCookie, session{Groups: []string{"family"}}, time.Hour)))
+	if !strings.Contains(html, "Search your links") || strings.Contains(html, "hx-get") || strings.Contains(html, "htmx") {
+		t.Errorf("page should only filter links, without HTMX:\n%s", html)
 	}
 }
 
