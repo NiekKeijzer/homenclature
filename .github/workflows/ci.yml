@@ -40,7 +40,7 @@ jobs:
         env:
           BEFORE: ${{ github.event.before }}
         run: |
-          if git diff --quiet "$BEFORE" HEAD -- go.mod go.sum Dockerfile; then
+          if git diff --quiet "$BEFORE" HEAD -- go.mod go.sum Dockerfile package.json package-lock.json; then
             echo "::notice::Image dependencies unchanged, no release"
             exit 0
           fi

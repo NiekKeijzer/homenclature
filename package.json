@@ -1,0 +1,11 @@
+{
+  "name": "homenclature",
+  "private": true,
+  "scripts": {
+    "assets": "rm -rf internal/server/web/static/lib && mkdir -p internal/server/web/static/lib && cp node_modules/htmx.org/dist/htmx.min.js node_modules/@fontsource-variable/sora/files/sora-latin-wght-normal.woff2 internal/server/web/static/lib/ && cp node_modules/@fontsource-variable/sora/LICENSE internal/server/web/static/lib/sora-OFL.txt"
+  },
+  "devDependencies": {
+    "@fontsource-variable/sora": "5.3.0",
+    "htmx.org": "2.0.11"
+  }
+}

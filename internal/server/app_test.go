@@ -85,7 +85,7 @@ func TestPageShowsLinksForGroups(t *testing.T) {
 	for _, want := range []string{
 		"Hello, Niek", "Paperless", "Proxmox", "Jellyfin", `src="` + iconURL("jellyfin") + `"`,
 		`class="search glass"`, `class="panel glass list"`, `class="panel glass cards"`,
-		`hx-get="/search"`, "/static/htmx.min.js",
+		`hx-get="/search"`, "/static/lib/htmx.min.js",
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("page is missing %q", want)

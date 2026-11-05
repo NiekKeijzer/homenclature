@@ -12,7 +12,10 @@ import (
 	"github.com/NiekKeijzer/homenclature/internal/config"
 )
 
-//go:embed web
+// web/static/lib (HTMX, Sora) is named so the build fails until `mise run
+// assets` has copied it from npm.
+//
+//go:embed web web/static/lib
 var webFS embed.FS
 
 var pageTmpl = template.Must(template.New("").Funcs(template.FuncMap{
