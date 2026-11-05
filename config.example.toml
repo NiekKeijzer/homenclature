@@ -49,6 +49,7 @@
 #     home-assistant  Profile > Security > Long-lived access tokens. Tokens
 #                     can't be read-only: make a non-admin user for this.
 #     immich          Account settings > API keys (asset.read and asset.view)
+#                     HOMENCLATURE_BACKGROUND=immich uses this key too
 #     jellyfin        Dashboard > API keys (searches everything), or a user's
 #                     access token (searches what that user may see)
 #     mealie          Profile > API tokens

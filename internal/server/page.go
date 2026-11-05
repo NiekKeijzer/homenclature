@@ -34,6 +34,7 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("GET /auth/callback", a.callback)
 	mux.HandleFunc("GET /search", a.search)
 	mux.HandleFunc("GET /search/thumb/{key}/{id}", a.searchThumb)
+	mux.HandleFunc("GET /background", a.backgroundPhoto)
 	mux.Handle("GET /icons/", a.icons)
 	mux.Handle("GET /static/", http.FileServerFS(static))
 	return mux
@@ -46,10 +47,12 @@ func (a *app) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := struct {
-		Name       string
-		Sections   []config.Section
-		Searchable bool // apps can be searched
-	}{s.Name, a.cfg.Sections(s.Groups), len(a.searchable(s.Groups)) > 0}
+		Name          string
+		Sections      []config.Section
+		Searchable    bool   // apps can be searched
+		Background    string // the mode, see background.go
+		PhotoInterval int    // seconds between background photos; 0 without photos
+	}{s.Name, a.cfg.Sections(s.Groups), len(a.searchable(s.Groups)) > 0, a.bg.mode, a.bg.photoInterval()}
 	if err := pageTmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		log.Printf("render: %v", err)
 	}

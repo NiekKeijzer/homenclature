@@ -56,7 +56,7 @@
   display: none !important;
 }
 
-/* Blobs behind the glass. They're painted on the page itself (not a fixed
+/* Blobs behind the glass (the default background). They're painted on the page itself (not a fixed
    layer) so iOS Safari also shows them behind its status bar and toolbar
    instead of black bars. iOS ignores `fixed` and scrolls them. */
 html {
@@ -68,6 +68,40 @@ html {
     radial-gradient(36% 36% at 8% 66%, var(--blob-3), transparent 70%);
   background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+/* Other backgrounds (HOMENCLATURE_BACKGROUND) sit in a fixed layer behind
+   the page. On iOS that layer may not reach under the bars, so the landscape
+   also paints its sky colour there. */
+html[data-background="landscape"] {
+  background: var(--sky-top, var(--bg));
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+}
+
+/* Photos fade in over the last one. Until the first loads, the blobs show. */
+.slideshow img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Tones photos towards the page background, so glass and text stay readable
+   on any photo. */
+.slideshow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: 0.4;
 }
 
 body {

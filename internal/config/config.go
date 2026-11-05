@@ -171,6 +171,17 @@ func isHTTPURL(s string) bool {
 	return err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https")
 }
 
+// Links returns every link in the file, in file order.
+func (c *Config) Links() []Link {
+	var out []Link
+	for _, name := range c.order {
+		for _, s := range c.Dashboards[name].Sections {
+			out = append(out, s.Links...)
+		}
+	}
+	return out
+}
+
 // Sections returns what a user in the given groups sees: their group
 // dashboards merged in file order, or the default dashboard if none match.
 // Sections with the same title are merged (the first layout set wins), and

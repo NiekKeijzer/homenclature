@@ -1,0 +1,32 @@
+<!-- Landscape background (HOMENCLATURE_BACKGROUND=landscape). app.js sets the
+     colours and moves the sun (or moon) by the visitor's time of day. Until
+     then it's transparent. Anchored at the bottom, so the hills always show. -->
+<svg class="backdrop landscape" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" style="stop-color: var(--sky-top, transparent)"/>
+      <stop offset="0.72" style="stop-color: var(--sky-bottom, transparent)"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" style="stop-color: var(--sun, transparent); stop-opacity: var(--glow, 0)"/>
+      <stop offset="1" style="stop-color: var(--sun, transparent); stop-opacity: 0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <g fill="#fff" style="opacity: var(--stars, 0)">
+    <circle cx="60" cy="300" r="1.4"/><circle cx="120" cy="80" r="1.6"/><circle cx="260" cy="190" r="1.2"/>
+    <circle cx="330" cy="360" r="1.4"/><circle cx="410" cy="60" r="2"/><circle cx="530" cy="240" r="1.4"/>
+    <circle cx="620" cy="40" r="1.6"/><circle cx="690" cy="120" r="1.2"/><circle cx="760" cy="310" r="1.6"/>
+    <circle cx="880" cy="70" r="1.4"/><circle cx="980" cy="380" r="1.2"/><circle cx="1010" cy="200" r="2"/>
+    <circle cx="1130" cy="90" r="1.2"/><circle cx="1240" cy="280" r="1.6"/><circle cx="1300" cy="420" r="1.2"/>
+    <circle cx="1360" cy="150" r="1.4"/><circle cx="1480" cy="60" r="1.8"/><circle cx="1550" cy="330" r="1.2"/>
+  </g>
+  <g class="sun">
+    <circle r="320" fill="url(#glow)"/>
+    <circle r="44" style="fill: var(--sun, transparent)"/>
+  </g>
+  <path style="fill: var(--hill-1, transparent)" d="M0 690C180 640 320 600 470 625S760 690 930 650 1240 580 1400 615 1560 660 1600 650V1000H0Z"/>
+  <path style="fill: var(--hill-2, transparent)" d="M0 760C220 700 420 720 600 755S980 800 1180 745 1480 700 1600 735V1000H0Z"/>
+  <path style="fill: var(--hill-3, transparent)" d="M0 830C260 790 520 800 760 840S1180 880 1400 830 1560 805 1600 815V1000H0Z"/>
+  <path style="fill: var(--hill-4, transparent)" d="M0 915C300 880 640 900 900 925S1380 950 1600 905V1000H0Z"/>
+</svg>

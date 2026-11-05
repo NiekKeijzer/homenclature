@@ -257,3 +257,20 @@ func TestSectionsWithoutDefault(t *testing.T) {
 		t.Errorf("got %v, want nothing", got)
 	}
 }
+
+func TestLinks(t *testing.T) {
+	t.Setenv(DefaultDashboardEnv, "")
+	c, err := load(t, sectionsConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, l := range c.Links() {
+		got = append(got, l.Title)
+	}
+	// File order, unmerged: parents' Admin comes before its Home section.
+	want := []string{"Guest wifi", "Home Assistant", "Proxmox", "Home Assistant (dupe)", "Paperless"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
