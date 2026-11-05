@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,14 +20,14 @@ import (
 )
 
 // DefaultLimit is how many results an app shows, unless its config sets
-// limit. Immich shows a grid of photos, so it gets more.
-const (
-	DefaultLimit       = 5
-	DefaultImmichLimit = 8
-)
+// limit. Immich has its own, DefaultImmichLimit.
+const DefaultLimit = 5
 
 // ErrInvalidID is returned for thumbnail IDs the app could never have produced.
 var ErrInvalidID = errors.New("invalid id")
+
+// uuid matches the thumbnail IDs of apps that use UUIDs (Immich, Mealie).
+var uuid = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // Result is one hit inside an app.
 type Result struct {
@@ -64,9 +65,24 @@ type Provider interface {
 	Thumbnail(ctx context.Context, id string) (Image, error)
 }
 
+// apps builds each search type's provider. To add an app: a file with its
+// provider and constructor, an entry here, and its type in config.SearchTypes.
+var apps = map[string]func(b base, s *config.Search) Provider{
+	"home-assistant": newHomeAssistant,
+	"immich":         newImmich,
+	"jellyfin":       newJellyfin,
+	"mealie":         newMealie,
+	"paperless":      newPaperless,
+	"seerr":          newSeerr,
+}
+
 // New returns the provider for a link with search enabled.
 func New(link config.Link, client *http.Client) (Provider, error) {
 	s := link.Search
+	newApp, ok := apps[s.Type]
+	if !ok {
+		return nil, fmt.Errorf("unknown search type %q", s.Type)
+	}
 	b := base{
 		apiClient: apiClient{http: client, base: strings.TrimSuffix(link.URL, "/")},
 		web:       strings.TrimSuffix(link.URL, "/"),
@@ -78,35 +94,8 @@ func New(link config.Link, client *http.Client) (Provider, error) {
 	}
 	if b.limit == 0 {
 		b.limit = DefaultLimit
-		if s.Type == "immich" {
-			b.limit = DefaultImmichLimit
-		}
 	}
-	switch s.Type {
-	case "home-assistant":
-		b.header = http.Header{"Authorization": {"Bearer " + s.Token}}
-		return &homeAssistant{base: b, domains: s.Domains}, nil
-	case "immich":
-		b.header = http.Header{"X-Api-Key": {s.Token}}
-		return &immich{base: b}, nil
-	case "jellyfin":
-		b.header = http.Header{"Authorization": {`MediaBrowser Token="` + s.Token + `"`}}
-		types := s.Types
-		if len(types) == 0 {
-			types = jellyfinDefaultTypes
-		}
-		return &jellyfin{base: b, types: types}, nil
-	case "mealie":
-		b.header = http.Header{"Authorization": {"Bearer " + s.Token}}
-		return &mealie{base: b}, nil
-	case "paperless":
-		b.header = http.Header{"Authorization": {"Token " + s.Token}}
-		return &paperless{base: b}, nil
-	case "seerr":
-		b.header = http.Header{"X-Api-Key": {s.Token}}
-		return &seerr{base: b, tmdb: apiClient{http: client, base: tmdbImages}}, nil
-	}
-	return nil, fmt.Errorf("unknown search type %q", s.Type)
+	return newApp(b, s), nil
 }
 
 // base is what every provider has.
