@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NiekKeijzer/homenclature/internal/config"
@@ -28,6 +29,7 @@ type app struct {
 	icons     *iconProxy
 	providers map[string]search.Provider // by searchKey
 	store     *keyStore                  // personal keys kept on the server; nil if off
+	keyLocks  sync.Map                   // by sub: a *sync.Mutex, see lockKeys
 	bg        background
 	oauth     *oauth2.Config
 	verifier  *oidc.IDTokenVerifier

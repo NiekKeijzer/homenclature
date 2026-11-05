@@ -136,7 +136,7 @@ volumes:
   homenclature-data:
 ```
 
-Each person then chooses for themselves, with "Keep your keys on all your devices" in the same list. Their keys move to one encrypted file on the server, and out of that browser. "Keep your keys in this browser only" moves them back and deletes the file. The app doesn't start if it can't write to the folder (with a bind mount, make it writable for uid 65532).
+Each person then chooses for themselves, with "Keep your keys on all your devices" in the same list. Their keys move to one encrypted file on the server, and out of that browser. "Keep your keys in this browser only" moves them back into that browser, and other devices lose them. The app doesn't start if it can't write to the folder (with a bind mount, make it writable for uid 65532).
 
 Changing `HOMENCLATURE_SESSION_SECRET` clears everyone's keys, in browsers and on the server, and searches go back to the shared token.
 

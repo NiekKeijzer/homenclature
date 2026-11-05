@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NiekKeijzer/homenclature/internal/config"
@@ -39,57 +40,59 @@ var keyHelp = map[string]string{
 
 // personalKeys is the keys cookie.
 type personalKeys struct {
-	Sub  string            `json:"sub"`  // whose keys they are
-	Keys map[string]string `json:"keys"` // by link URL
+	Sub  string            `json:"sub"`           // whose keys they are
+	Keys map[string]string `json:"keys"`          // by link URL
+	Gen  int               `json:"gen,omitempty"` // userKeys.Gen when it was set
 }
 
 // userKeys are the user's own keys, and where they're kept.
 type userKeys struct {
 	Keys     map[string]string // by link URL; nil if they have none
 	OnServer bool              // in the key store, for all their devices; else in this browser
+	// Gen counts the user's moves to the server (0 if none). A keys cookie
+	// from an older one was left on another device meanwhile, so it's stale:
+	// once the keys are back in a browser, only that browser's count.
+	Gen int
 }
 
 // readKeys returns the user's own keys: from the key store if they keep
 // them there, else from this browser. Keys of someone else who used this
-// browser are ignored.
+// browser, or stale ones, are ignored.
 func (a *app) readKeys(r *http.Request, s session) userKeys {
 	if s.Sub == "" {
 		return userKeys{}
 	}
+	var stored storedKeys
 	if a.store != nil {
-		if keys, ok := a.store.get(s.Sub); ok {
-			return userKeys{Keys: keys, OnServer: true}
+		stored, _ = a.store.get(s.Sub)
+		if stored.OnServer {
+			return userKeys{Keys: stored.Keys, OnServer: true, Gen: stored.Gen}
 		}
 	}
 	var k personalKeys
-	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub {
-		return userKeys{}
+	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub || k.Gen != stored.Gen {
+		return userKeys{Gen: stored.Gen}
 	}
-	return userKeys{Keys: k.Keys}
+	return userKeys{Keys: k.Keys, Gen: k.Gen}
 }
 
 // renewKeys gives the user's keys in this browser a fresh TTL, so they only
-// expire after keysTTL without a login. If they keep their keys on the
-// server, it removes their old ones left in this browser, so those don't
-// come back if they move their keys to another browser.
+// expire after keysTTL without a login.
 func (a *app) renewKeys(w http.ResponseWriter, r *http.Request, s session) {
-	if k := a.readKeys(r, s); !k.OnServer {
-		if len(k.Keys) > 0 {
-			a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys}, keysTTL)
-		}
-		return
-	}
-	var old personalKeys
-	if a.readCookie(r, keysCookie, &old) && old.Sub == s.Sub {
-		a.clearCookie(w, keysCookie)
+	if k := a.readKeys(r, s); !k.OnServer && len(k.Keys) > 0 {
+		a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys, k.Gen}, keysTTL)
 	}
 }
 
-// writeKeys saves k where it says. Moved from the other place (wasOnServer
-// differs), it's removed there.
+// writeKeys saves k where it says. Moved to the server, the keys leave this
+// browser and Gen goes up, so the cookies left anywhere go stale. Moved back,
+// the file stays without keys, to keep Gen.
 func (a *app) writeKeys(w http.ResponseWriter, s session, k userKeys, wasOnServer bool) error {
 	if k.OnServer {
-		if err := a.store.put(s.Sub, k.Keys); err != nil {
+		if !wasOnServer {
+			k.Gen++
+		}
+		if err := a.store.put(s.Sub, storedKeys{OnServer: true, Gen: k.Gen, Keys: k.Keys}); err != nil {
 			return err
 		}
 		// Keys read from this browser were the user's; with none, a keys
@@ -100,12 +103,21 @@ func (a *app) writeKeys(w http.ResponseWriter, s session, k userKeys, wasOnServe
 		return nil
 	}
 	if wasOnServer {
-		if err := a.store.remove(s.Sub); err != nil {
+		if err := a.store.put(s.Sub, storedKeys{Gen: k.Gen}); err != nil {
 			return err
 		}
 	}
-	a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys}, keysTTL)
+	a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys, k.Gen}, keysTTL)
 	return nil
+}
+
+// lockKeys holds the user's keys until unlock, so two changes at once (from
+// two devices, say) can't read the same keys and undo each other.
+func (a *app) lockKeys(sub string) (unlock func()) {
+	m, _ := a.keyLocks.LoadOrStore(sub, new(sync.Mutex))
+	mu := m.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
 }
 
 // provider searches l with the user's own key if they set one, else with
@@ -170,6 +182,7 @@ func (a *app) saveKey(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	defer a.lockKeys(s.Sub)()
 	k, wasOnServer := a.keysToChange(r, s)
 	apps := a.keyApps(s, k.Keys)
 	i, failed, ok := a.changeKeys(r, apps, &k)
@@ -201,6 +214,7 @@ func (a *app) commandKey(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Log in again to change your keys.", http.StatusUnauthorized)
 		return
 	}
+	defer a.lockKeys(s.Sub)()
 	k, wasOnServer := a.keysToChange(r, s)
 	apps := a.keyApps(s, k.Keys)
 	i, failed, ok := a.changeKeys(r, apps, &k)

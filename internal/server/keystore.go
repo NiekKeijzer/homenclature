@@ -17,12 +17,19 @@ import (
 )
 
 // keyStore keeps the personal keys of people who chose to have them on all
-// their devices: one encrypted file each in HOMENCLATURE_DATA_DIR. The file
-// is that choice, so it's there even while they have no keys. Everyone else's
-// keys stay in their browser (keys.go).
+// their devices: one encrypted file each in HOMENCLATURE_DATA_DIR. Everyone
+// else's keys stay in their browser (keys.go).
 type keyStore struct {
 	dir  string
 	aead cipher.AEAD
+}
+
+// storedKeys is a person's file. It records their choice, so it stays while
+// they have no keys, and after they move them back to a browser, to keep Gen.
+type storedKeys struct {
+	OnServer bool              `json:"on_server"` // false: they moved them back to a browser
+	Gen      int               `json:"gen"`       // see userKeys.Gen
+	Keys     map[string]string `json:"keys,omitempty"`
 }
 
 // newKeyStore returns the store in dir, or nil if dir is empty: then keys are
@@ -58,36 +65,36 @@ func (ks *keyStore) path(sub string) string {
 	return filepath.Join(ks.dir, hex.EncodeToString(h[:])+".keys")
 }
 
-// get returns sub's keys by link URL, and whether sub keeps them here. A
-// file that can't be read counts as kept here without keys, so saving a key
-// replaces it.
-func (ks *keyStore) get(sub string) (map[string]string, bool) {
+// get returns sub's file, and whether there is one. A file that can't be
+// read counts as keys kept here, without any, so saving a key replaces it.
+func (ks *keyStore) get(sub string) (storedKeys, bool) {
 	data, err := os.ReadFile(ks.path(sub))
 	if errors.Is(err, fs.ErrNotExist) {
-		return nil, false
+		return storedKeys{}, false
 	}
+	unreadable := storedKeys{OnServer: true}
 	if err != nil {
 		log.Printf("keys: %v", err)
-		return nil, true
+		return unreadable, true
 	}
-	var keys map[string]string
 	n := ks.aead.NonceSize()
 	if len(data) < n {
 		log.Printf("keys: %s is too short", ks.path(sub))
-		return nil, true
+		return unreadable, true
 	}
 	// The subject is bound into the ciphertext, so files can't be swapped.
+	var stored storedKeys
 	plain, err := ks.aead.Open(nil, data[:n], data[n:], []byte(sub))
-	if err != nil || json.Unmarshal(plain, &keys) != nil {
+	if err != nil || json.Unmarshal(plain, &stored) != nil {
 		log.Printf("keys: can't decrypt %s; was HOMENCLATURE_SESSION_SECRET changed?", ks.path(sub))
-		return nil, true
+		return unreadable, true
 	}
-	return keys, true
+	return stored, true
 }
 
-// put saves sub's keys, replacing what was there.
-func (ks *keyStore) put(sub string, keys map[string]string) error {
-	plain, _ := json.Marshal(keys) // can't fail for a map of strings
+// put saves sub's file, replacing what was there.
+func (ks *keyStore) put(sub string, stored storedKeys) error {
+	plain, _ := json.Marshal(stored) // can't fail for this struct
 	nonce := make([]byte, ks.aead.NonceSize())
 	rand.Read(nonce)
 	// Write a new file and rename it over the old one, so a file is never
@@ -102,12 +109,4 @@ func (ks *keyStore) put(sub string, keys map[string]string) error {
 		return err
 	}
 	return os.Rename(f.Name(), ks.path(sub))
-}
-
-// remove deletes sub's keys: they're kept in the browser again.
-func (ks *keyStore) remove(sub string) error {
-	if err := os.Remove(ks.path(sub)); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return err
-	}
-	return nil
 }

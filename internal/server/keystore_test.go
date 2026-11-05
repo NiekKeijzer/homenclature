@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -29,21 +30,15 @@ func TestKeyStore(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "data") // made if missing
 	ks := newTestStore(t, dir)
 
-	if keys, ok := ks.get("me"); ok || keys != nil {
-		t.Fatalf("before put: got %v, %t; want nothing", keys, ok)
+	if stored, ok := ks.get("me"); ok || stored.OnServer || stored.Keys != nil {
+		t.Fatalf("before put: got %+v, %t; want nothing", stored, ok)
 	}
-	// An empty file still says the keys are kept here.
-	if err := ks.put("me", map[string]string{}); err != nil {
+	want := storedKeys{OnServer: true, Gen: 2, Keys: map[string]string{paperlessURL: "mine"}}
+	if err := ks.put("me", want); err != nil {
 		t.Fatal(err)
 	}
-	if keys, ok := ks.get("me"); !ok || len(keys) != 0 {
-		t.Errorf("no keys: got %v, %t; want none, kept here", keys, ok)
-	}
-	if err := ks.put("me", map[string]string{paperlessURL: "mine"}); err != nil {
-		t.Fatal(err)
-	}
-	if keys, ok := ks.get("me"); !ok || keys[paperlessURL] != "mine" {
-		t.Errorf("got %v, %t; want the key", keys, ok)
+	if stored, ok := ks.get("me"); !ok || !stored.OnServer || stored.Gen != 2 || stored.Keys[paperlessURL] != "mine" {
+		t.Errorf("got %+v, %t; want %+v", stored, ok, want)
 	}
 
 	data, err := os.ReadFile(ks.path("me"))
@@ -60,25 +55,15 @@ func TestKeyStore(t *testing.T) {
 		t.Errorf("got %d files, want only the keys file", len(entries))
 	}
 
-	// Someone else's file under my name, or a file from another secret, is
-	// kept here but has no keys.
+	// Someone else's file under my name, or a file from another secret,
+	// counts as keys kept here, without any.
 	os.WriteFile(ks.path("other"), data, 0o600)
-	if keys, ok := ks.get("other"); !ok || keys != nil {
-		t.Errorf("swapped file: got %v, %t; want no keys", keys, ok)
+	if stored, ok := ks.get("other"); !ok || !stored.OnServer || stored.Keys != nil {
+		t.Errorf("swapped file: got %+v, %t; want kept here, no keys", stored, ok)
 	}
 	other, _ := newKeyStore(dir, "another-secret-another-secret-another")
-	if keys, ok := other.get("me"); !ok || keys != nil {
-		t.Errorf("other secret: got %v, %t; want no keys", keys, ok)
-	}
-
-	if err := ks.remove("me"); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := ks.get("me"); ok {
-		t.Error("removed keys are still kept here")
-	}
-	if err := ks.remove("me"); err != nil {
-		t.Errorf("removing again: %v", err)
+	if stored, ok := other.get("me"); !ok || !stored.OnServer || stored.Keys != nil {
+		t.Errorf("other secret: got %+v, %t; want kept here, no keys", stored, ok)
 	}
 }
 
@@ -148,8 +133,8 @@ func TestKeysOnServer(t *testing.T) {
 	if back == nil || back.MaxAge != int(keysTTL.Seconds()) {
 		t.Fatalf("got keys cookie %v, want one for %v", back, keysTTL)
 	}
-	if _, ok := a.store.get("test-sub"); ok {
-		t.Error("the keys are still on the server")
+	if stored, _ := a.store.get("test-sub"); stored.OnServer || stored.Keys != nil {
+		t.Errorf("the keys are still on the server: %+v", stored)
 	}
 	if got := tokenUsed(t, a, lastToken, me, back); got != "Token mine" {
 		t.Errorf("search sent %q, want the personal key from this browser", got)
@@ -221,24 +206,117 @@ func TestKeysPageMove(t *testing.T) {
 	}
 }
 
+// A keys cookie left on another device while the keys were on the server is
+// stale once they're moved back to a browser: it isn't used or renewed.
+func TestKeysStaleCookie(t *testing.T) {
+	a, lastToken := newKeysApp(t)
+	a.store = newTestStore(t, t.TempDir())
+	me := login(a, "parents")
+	other := keysFor(a, "test-sub", map[string]string{paperlessURL: "mine"}, time.Hour) // another device
+
+	resp := moveKeys(a, "server", me, keysFor(a, "test-sub", map[string]string{paperlessURL: "mine"}, time.Hour))
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("move to server: got %d", resp.StatusCode)
+	}
+	if got := tokenUsed(t, a, lastToken, me, other); got != "Token mine" {
+		t.Errorf("on the server: search sent %q, want the key from the server", got)
+	}
+	// Remove the key, then move back to this browser, with no keys.
+	post(a, "/commands/keys", url.Values{"app": {appKey(a, "parents")}, "action": {"remove"}}, me)
+	resp = moveKeys(a, "browser", me)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("move back: got %d", resp.StatusCode)
+	}
+	if got := tokenUsed(t, a, lastToken, me, other); got != "Token shared" {
+		t.Errorf("the other device's old cookie sent %q, want the shared key", got)
+	}
+	if html := body(t, get(a, "/", me, other)); !strings.Contains(html, "Use your own Paperless key") {
+		t.Error("the other device's old cookie shows as a key")
+	}
+	req := httptest.NewRequest(http.MethodGet, "/auth/callback", nil)
+	req.AddCookie(other)
+	rec := httptest.NewRecorder()
+	a.renewKeys(rec, req, session{Sub: "test-sub"})
+	if c := savedKeys(rec.Result()); c != nil {
+		t.Errorf("a login renewed the stale cookie: %v", c)
+	}
+
+	// This browser's cookie, set when moving back, counts; a new one too.
+	resp = post(a, "/commands/keys", url.Values{"app": {appKey(a, "parents")}, "action": {"save"}, "key": {"mine"}}, me, savedKeys(resp))
+	if got := tokenUsed(t, a, lastToken, me, savedKeys(resp)); got != "Token mine" {
+		t.Errorf("a key saved after moving back sent %q, want it", got)
+	}
+}
+
 func TestRenewKeysOnServer(t *testing.T) {
 	a, _ := newKeysApp(t)
 	a.store = newTestStore(t, t.TempDir())
-	a.store.put("test-sub", map[string]string{paperlessURL: "mine"})
-	s := session{Sub: "test-sub"}
-	for name, tt := range map[string]struct {
-		sub     string
-		cleared bool
-	}{"own, left from before": {"test-sub", true}, "someone else's": {"someone-else", false}} {
-		t.Run(name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/auth/callback", nil)
-			req.AddCookie(keysFor(a, tt.sub, map[string]string{paperlessURL: "old"}, time.Hour))
-			rec := httptest.NewRecorder()
-			a.renewKeys(rec, req, s)
-			c := savedKeys(rec.Result())
-			if cleared := c != nil && c.MaxAge < 0; cleared != tt.cleared || (c != nil && !cleared) {
-				t.Errorf("got keys cookie %v, want cleared: %t", c, tt.cleared)
-			}
-		})
+	a.store.put("test-sub", storedKeys{OnServer: true, Gen: 1, Keys: map[string]string{paperlessURL: "mine"}})
+	req := httptest.NewRequest(http.MethodGet, "/auth/callback", nil)
+	req.AddCookie(keysFor(a, "test-sub", map[string]string{paperlessURL: "old"}, time.Hour))
+	rec := httptest.NewRecorder()
+	a.renewKeys(rec, req, session{Sub: "test-sub"})
+	if c := savedKeys(rec.Result()); c != nil {
+		t.Errorf("with keys on the server, a login set keys cookie %v", c)
+	}
+}
+
+// Two changes at once can't undo each other: while one key is checked in the
+// app, a move waits for it, then moves the key too.
+func TestKeysChangedOneAtATime(t *testing.T) {
+	checking, release := make(chan struct{}), make(chan struct{})
+	paperless := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") == "Token slow" {
+			close(checking)
+			<-release
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"count": 0, "results": []}`)
+	}))
+	t.Cleanup(paperless.Close)
+	t.Setenv("TEST_TOKEN", "shared")
+	a := newTestApp(t, `
+[[dashboards.parents.sections]]
+title = "Home"
+[[dashboards.parents.sections.links]]
+title = "Paperless"
+url = "`+paperlessURL+`"
+search = { type = "paperless", token_env = "TEST_TOKEN", api_url = "`+paperless.URL+`" }
+`)
+	a.store = newTestStore(t, t.TempDir())
+	me := login(a, "parents")
+	if resp := moveKeys(a, "server", me); resp.StatusCode != http.StatusOK {
+		t.Fatalf("move to server: got %d", resp.StatusCode)
+	}
+
+	saved, moved := make(chan *http.Response), make(chan *http.Response)
+	go func() {
+		saved <- post(a, "/commands/keys", url.Values{"app": {appKey(a, "parents")}, "action": {"save"}, "key": {"slow"}}, me)
+	}()
+	<-checking
+	go func() { moved <- moveKeys(a, "browser", me) }()
+	var resp *http.Response
+	select {
+	case resp = <-moved:
+		t.Error("the move ran while the key was being checked")
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(release)
+	if resp := <-saved; resp.StatusCode != http.StatusOK {
+		t.Fatalf("save: got %d", resp.StatusCode)
+	}
+	if resp == nil {
+		resp = <-moved
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("move: got %d", resp.StatusCode)
+	}
+	if stored, _ := a.store.get("test-sub"); stored.OnServer {
+		t.Errorf("the save undid the move: %+v", stored)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(savedKeys(resp))
+	if k := a.readKeys(req, session{Sub: "test-sub"}); k.Keys[paperlessURL] != "slow" {
+		t.Errorf("the move lost the saved key: %+v", k)
 	}
 }
