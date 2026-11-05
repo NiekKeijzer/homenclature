@@ -5,3 +5,6 @@ config.homelab.toml
 # npm packages; `mise run assets` copies what the app serves into static/lib
 /node_modules/
 /internal/server/web/static/lib/
+
+# environment variables
+.env
