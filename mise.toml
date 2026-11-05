@@ -4,6 +4,9 @@ node = "26" # npm installs HTMX and the Sora font, see package.json
 jq = "1.8.2" # used by .claude/hooks/go-check.sh
 air = "1.67" # live reload for `mise run dev`
 
+[env]
+'_'.file = { path = ".env" }
+
 [tasks.assets]
 description = "Install HTMX and the Sora font from npm into internal/server/web/static/lib"
 run = "npm ci && npm run assets"
@@ -17,7 +20,7 @@ depends = ["assets"]
 run = "air -c dev/air.toml"
 
 [tasks.dev.env]
-HOMENCLATURE_CONFIG = "{{ get_env(name='HOMENCLATURE_CONFIG', default='config.example.toml') }}"
+HOMENCLATURE_CONFIG = "{{ env.HOMENCLATURE_CONFIG | default(value='config.example.toml') }}"
 HOMENCLATURE_URL = "http://localhost:8000" # air's proxy, see dev/air.toml
 HOMENCLATURE_LISTEN = ":8001"
 HOMENCLATURE_OIDC_ISSUER = "http://localhost:8080/default"
@@ -25,15 +28,15 @@ HOMENCLATURE_OIDC_CLIENT_ID = "homenclature"
 HOMENCLATURE_OIDC_CLIENT_SECRET = "dev"
 HOMENCLATURE_SESSION_SECRET = "dev-only-session-secret-not-for-production"
 HOMENCLATURE_BACKGROUND="landscape"
-# Search tokens for config.example.toml: your own if exported, else "dev"
+# Search tokens for config.example.toml: your own if set in .env or exported, else "dev"
 # (the example's apps don't exist, so their searches fail: logged, not shown).
-# Task env beats the shell, hence get_env.
-HOMENCLATURE_HOME_ASSISTANT_TOKEN = "{{ get_env(name='HOMENCLATURE_HOME_ASSISTANT_TOKEN', default='dev') }}"
-HOMENCLATURE_IMMICH_TOKEN = "{{ get_env(name='HOMENCLATURE_IMMICH_TOKEN', default='dev') }}"
-HOMENCLATURE_JELLYFIN_TOKEN = "{{ get_env(name='HOMENCLATURE_JELLYFIN_TOKEN', default='dev') }}"
-HOMENCLATURE_MEALIE_TOKEN = "{{ get_env(name='HOMENCLATURE_MEALIE_TOKEN', default='dev') }}"
-HOMENCLATURE_PAPERLESS_TOKEN = "{{ get_env(name='HOMENCLATURE_PAPERLESS_TOKEN', default='dev') }}"
-HOMENCLATURE_SEERR_TOKEN = "{{ get_env(name='HOMENCLATURE_SEERR_TOKEN', default='dev') }}"
+# Task env beats [env] and the shell, so read them via env (get_env misses .env).
+HOMENCLATURE_HOME_ASSISTANT_TOKEN = "{{ env.HOMENCLATURE_HOME_ASSISTANT_TOKEN | default(value='dev') }}"
+HOMENCLATURE_IMMICH_TOKEN = "{{ env.HOMENCLATURE_IMMICH_TOKEN | default(value='dev') }}"
+HOMENCLATURE_JELLYFIN_TOKEN = "{{ env.HOMENCLATURE_JELLYFIN_TOKEN | default(value='dev') }}"
+HOMENCLATURE_MEALIE_TOKEN = "{{ env.HOMENCLATURE_MEALIE_TOKEN | default(value='dev') }}"
+HOMENCLATURE_PAPERLESS_TOKEN = "{{ env.HOMENCLATURE_PAPERLESS_TOKEN | default(value='dev') }}"
+HOMENCLATURE_SEERR_TOKEN = "{{ env.HOMENCLATURE_SEERR_TOKEN | default(value='dev') }}"
 
 [tasks.oidc]
 description = "Start mock OIDC at http://localhost:8080/default"

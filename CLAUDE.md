@@ -44,7 +44,7 @@ A household homepage: a simple frosted-glass ("liquid glass") page of links. Use
 | `HOMENCLATURE_BACKGROUND_IMMICH_ALBUM` | required for `immich`: the album ID |
 | app tokens for search | named per link by `token_env` in the config |
 
-`mise run dev` sets dev values for all of these.
+`mise run dev` sets dev values for all of these. `HOMENCLATURE_CONFIG` and the example config's search tokens can come from `.env` (gitignored, loaded by mise) instead.
 - Images: `ghcr.io/niekkeijzer/homenclature` and `docker.io/niekkeijzer/homenclature`, for amd64 and arm64. `v*` tags publish semver tags + `latest`; `main` publishes `edge`. See `.github/workflows/ci.yml`. Docker Hub needs the `DOCKERHUB_USERNAME` repo variable and the `DOCKERHUB_TOKEN` repo secret.
 - CI (`.github/workflows/ci.yml`): `mise run check` on every push to `main`, `v*` tag and pull request. Images are published only after it passes.
 - Renovate (`.github/renovate.json5`): actions and images pinned to digests, npm packages pinned exactly. Minor, patch and digest updates automerge; majors request a review from NiekKeijzer. When an automerged update changes `go.mod`, `go.sum`, the `Dockerfile`, `package.json` or `package-lock.json`, CI publishes the next patch release (needs a first `v*` tag pushed by hand).
