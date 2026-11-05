@@ -37,6 +37,8 @@ HOMENCLATURE_JELLYFIN_TOKEN = "{{ env.HOMENCLATURE_JELLYFIN_TOKEN | default(valu
 HOMENCLATURE_MEALIE_TOKEN = "{{ env.HOMENCLATURE_MEALIE_TOKEN | default(value='dev') }}"
 HOMENCLATURE_PAPERLESS_TOKEN = "{{ env.HOMENCLATURE_PAPERLESS_TOKEN | default(value='dev') }}"
 HOMENCLATURE_SEERR_TOKEN = "{{ env.HOMENCLATURE_SEERR_TOKEN | default(value='dev') }}"
+# The example's Immich URL comes from an env var too (url_env).
+HOMENCLATURE_IMMICH_URL = "{{ env.HOMENCLATURE_IMMICH_URL | default(value='https://photos.home.example') }}"
 
 [tasks.oidc]
 description = "Start mock OIDC at http://localhost:8080/default"

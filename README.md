@@ -69,6 +69,7 @@ Image tags: `latest` and versions like `0.1.0` and `0.1` for releases, `edge` fo
 | `HOMENCLATURE_CONFIG` | Path to the config file. Default `/config/config.toml` in Docker. |
 | `HOMENCLATURE_LISTEN` | Listen address. Default `:8000`. |
 | Your app tokens | For search inside apps: one env var per app, named in the config (`token_env`). |
+| Your app URLs | Optional: any URL in the config can come from an env var you name instead (`url_env`, `api_url_env`, `seerr_url_env`). |
 
 ## Configure
 
@@ -109,6 +110,8 @@ search = { type = "jellyfin", token_env = "JELLYFIN_TOKEN", seerr_url = "https:/
 ```
 
 Types: `home-assistant`, `immich`, `jellyfin`, `mealie`, `paperless` and `seerr`. Optional for all: `api_url` (where the server reaches the app, e.g. `http://jellyfin:8096`) and `limit` (results shown). Jellyfin also takes `types` (which kinds of items) and `seerr_url` (adds "Request it in Seerr" for people who can't search Seerr itself). Home Assistant takes `domains`, e.g. `["light", "sensor"]`.
+
+URLs can come from env vars too: write `url_env`, `api_url_env` or `seerr_url_env` with the env var's name instead of `url`, `api_url` or `seerr_url`. Set one or the other; the app won't start if the env var is unset.
 
 Searches run with that token, so results show what the token can see, to anyone with the link on their page. Give each group its own token where that matters (e.g. a kids' Jellyfin user).
 

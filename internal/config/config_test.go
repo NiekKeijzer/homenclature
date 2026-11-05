@@ -31,15 +31,17 @@ func summary(sections []Section) []string {
 	return out
 }
 
-// setExampleTokens sets the search token env vars config.example.toml needs.
-func setExampleTokens(t *testing.T) {
+// setExampleEnv sets the env vars config.example.toml needs: the search
+// tokens and the Immich URL.
+func setExampleEnv(t *testing.T) {
 	for _, app := range []string{"HOME_ASSISTANT", "IMMICH", "JELLYFIN", "MEALIE", "PAPERLESS", "SEERR"} {
 		t.Setenv("HOMENCLATURE_"+app+"_TOKEN", "test")
 	}
+	t.Setenv("HOMENCLATURE_IMMICH_URL", "https://photos.home.example")
 }
 
 func TestExampleConfig(t *testing.T) {
-	setExampleTokens(t)
+	setExampleEnv(t)
 	t.Setenv(DefaultDashboardEnv, "family")
 	c, err := Load("../../config.example.toml")
 	if err != nil {
@@ -100,6 +102,31 @@ layout = "grid"
 			`search: api_url must be an http(s) URL, got "jellyfin:8096"`},
 		"relative seerr_url": {searchLink(`type = "jellyfin", token_env = "HOME", seerr_url = "/seerr"`),
 			`search: seerr_url must be an http(s) URL, got "/seerr"`},
+		"url and url_env": {`
+[[dashboards.kids.sections]]
+title = "Media"
+[[dashboards.kids.sections.links]]
+title = "Jellyfin"
+url = "https://jellyfin.example"
+url_env = "HOME"
+`, "dashboards.kids.sections[0].links[0]: set url or url_env, not both"},
+		"url env unset": {`
+[[dashboards.kids.sections]]
+title = "Media"
+[[dashboards.kids.sections.links]]
+title = "Jellyfin"
+url_env = "HOMENCLATURE_TEST_UNSET"
+`, "dashboards.kids.sections[0].links[0]: env var HOMENCLATURE_TEST_UNSET (url_env) is not set"},
+		"api_url and api_url_env": {searchLink(`type = "jellyfin", token_env = "HOME", api_url = "http://jellyfin:8096", api_url_env = "HOME"`),
+			"search: set api_url or api_url_env, not both"},
+		"api_url env unset": {searchLink(`type = "jellyfin", token_env = "HOME", api_url_env = "HOMENCLATURE_TEST_UNSET"`),
+			"search: env var HOMENCLATURE_TEST_UNSET (api_url_env) is not set"},
+		"relative api_url from env": {searchLink(`type = "jellyfin", token_env = "HOME", api_url_env = "HOMENCLATURE_TEST_RELATIVE"`),
+			`search: api_url must be an http(s) URL, got "jellyfin:8096"`},
+		"seerr_url env unset": {searchLink(`type = "jellyfin", token_env = "HOME", seerr_url_env = "HOMENCLATURE_TEST_UNSET"`),
+			"search: env var HOMENCLATURE_TEST_UNSET (seerr_url_env) is not set"},
+		"seerr_url_env on another app": {searchLink(`type = "immich", token_env = "HOME", seerr_url_env = "HOMENCLATURE_TEST_UNSET"`),
+			"search: seerr_url only applies to type jellyfin"},
 		"limit too high": {searchLink(`type = "jellyfin", token_env = "HOME", limit = 51`),
 			"search: limit must be between 1 and 50, got 51"},
 		"unknown jellyfin type": {searchLink(`type = "jellyfin", token_env = "HOME", types = ["Movies"]`),
@@ -109,6 +136,7 @@ layout = "grid"
 		"domains on another app": {searchLink(`type = "jellyfin", token_env = "HOME", domains = ["light"]`),
 			"search: domains only applies to type home-assistant"},
 	}
+	t.Setenv("HOMENCLATURE_TEST_RELATIVE", "jellyfin:8096")
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			_, err := load(t, tt.config)
@@ -144,8 +172,32 @@ func TestSearchLoaded(t *testing.T) {
 	}
 }
 
+func TestURLsFromEnv(t *testing.T) {
+	t.Setenv("HOMENCLATURE_TEST_TOKEN", "s3cret")
+	t.Setenv("HOMENCLATURE_TEST_URL", "https://jellyfin.example")
+	t.Setenv("HOMENCLATURE_TEST_API_URL", "http://jellyfin:8096")
+	t.Setenv("HOMENCLATURE_TEST_SEERR_URL", "https://seerr.example")
+	c, err := load(t, `
+[[dashboards.kids.sections]]
+title = "Media"
+[[dashboards.kids.sections.links]]
+title = "Jellyfin"
+url_env = "HOMENCLATURE_TEST_URL"
+search = { type = "jellyfin", token_env = "HOMENCLATURE_TEST_TOKEN", api_url_env = "HOMENCLATURE_TEST_API_URL", seerr_url_env = "HOMENCLATURE_TEST_SEERR_URL" }
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l := c.Dashboards["kids"].Sections[0].Links[0]
+	got := []string{l.URL, l.Search.APIURL, l.Search.SeerrURL}
+	want := []string{"https://jellyfin.example", "http://jellyfin:8096", "https://seerr.example"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestExampleConfigNeedsSearchTokens(t *testing.T) {
-	setExampleTokens(t)
+	setExampleEnv(t)
 	t.Setenv("HOMENCLATURE_JELLYFIN_TOKEN", "")
 	_, err := Load("../../config.example.toml")
 	if err == nil || !strings.Contains(err.Error(), "env var HOMENCLATURE_JELLYFIN_TOKEN (token_env) is not set") {

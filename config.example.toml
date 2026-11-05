@@ -22,6 +22,11 @@
 # icon: a name from https://github.com/homarr-labs/dashboard-icons (e.g. "jellyfin")
 #       or a full URL. The server fetches and caches icons.
 #
+# URLs from env vars: instead of url, api_url or seerr_url, name the env var
+#   holding it in url_env, api_url_env or seerr_url_env
+#   (e.g. url_env = "HOMENCLATURE_JELLYFIN_URL"). Set one or the other, not
+#   both; the app won't start if the env var is unset.
+#
 # search: opt in to searching inside the app from the search box. Results
 #   link straight to the item in the app. Nothing in the app is changed.
 #     type      (required) home-assistant, immich, jellyfin, mealie, paperless
@@ -83,7 +88,7 @@ search = { type = "seerr", token_env = "HOMENCLATURE_SEERR_TOKEN" }
 
 [[dashboards.family.sections.links]]
 title = "Immich"
-url = "https://photos.home.example"
+url_env = "HOMENCLATURE_IMMICH_URL" # the URL comes from this env var, like the token
 icon = "immich"
 description = "Photos"
 search = { type = "immich", token_env = "HOMENCLATURE_IMMICH_TOKEN" }
