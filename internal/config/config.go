@@ -37,7 +37,8 @@ type Section struct {
 type Link struct {
 	Title       string  `toml:"title"`
 	URL         string  `toml:"url"`
-	Icon        string  `toml:"icon"` // dashboard-icons name or URL
+	URLEnv      string  `toml:"url_env"` // env var holding the URL, instead of url
+	Icon        string  `toml:"icon"`    // dashboard-icons name or URL
 	Description string  `toml:"description"`
 	Search      *Search `toml:"search"` // nil: the app isn't searched
 }
@@ -56,14 +57,16 @@ const MaxSearchLimit = 50
 
 // Search opts a link in to searching inside the app, through its API.
 type Search struct {
-	Type     string `toml:"type"`      // one of SearchTypes
-	TokenEnv string `toml:"token_env"` // env var holding the API token
-	APIURL   string `toml:"api_url"`   // where the server reaches the API; default: the link URL
-	Limit    int    `toml:"limit"`     // results shown; 0: the app's default
+	Type      string `toml:"type"`        // one of SearchTypes
+	TokenEnv  string `toml:"token_env"`   // env var holding the API token
+	APIURL    string `toml:"api_url"`     // where the server reaches the API; default: the link URL
+	APIURLEnv string `toml:"api_url_env"` // env var holding api_url, instead of api_url
+	Limit     int    `toml:"limit"`       // results shown; 0: the app's default
 
-	Types    []string `toml:"types"`     // jellyfin: item types (JellyfinTypes); empty: a default set
-	SeerrURL string   `toml:"seerr_url"` // jellyfin: also link to a Seerr search
-	Domains  []string `toml:"domains"`   // home-assistant: entity domains, e.g. "light"; empty: all
+	Types       []string `toml:"types"`         // jellyfin: item types (JellyfinTypes); empty: a default set
+	SeerrURL    string   `toml:"seerr_url"`     // jellyfin: also link to a Seerr search
+	SeerrURLEnv string   `toml:"seerr_url_env"` // jellyfin: env var holding seerr_url, instead of seerr_url
+	Domains     []string `toml:"domains"`       // home-assistant: entity domains, e.g. "light"; empty: all
 
 	Token string `toml:"-"` // read from TokenEnv by Load
 }
@@ -110,12 +113,15 @@ func (c *Config) validate() error {
 			if s.Layout != "" && s.Layout != "list" && s.Layout != "cards" {
 				errs = append(errs, fmt.Errorf("%s: layout must be list or cards, got %q", at, s.Layout))
 			}
-			for j, l := range s.Links {
+			for j := range s.Links {
+				l := &s.Links[j]
 				at := fmt.Sprintf("%s.links[%d]", at, j)
 				if l.Title == "" {
 					errs = append(errs, fmt.Errorf("%s: title is required", at))
 				}
-				if u, err := url.Parse(l.URL); err != nil || u.Scheme == "" {
+				if err := fromEnv(at, "url", &l.URL, l.URLEnv); err != nil {
+					errs = append(errs, err)
+				} else if u, err := url.Parse(l.URL); err != nil || u.Scheme == "" {
 					errs = append(errs, fmt.Errorf("%s: url must be absolute, got %q", at, l.URL))
 				}
 				if l.Search != nil {
@@ -127,7 +133,24 @@ func (c *Config) validate() error {
 	return errors.Join(errs...)
 }
 
-// load validates s and reads its token from the environment.
+// fromEnv sets *value from the env var named env, the key_env form of key.
+// Nothing happens if env is empty. Setting both, or naming an unset env var,
+// is an error.
+func fromEnv(at, key string, value *string, env string) error {
+	if env == "" {
+		return nil
+	}
+	if *value != "" {
+		return fmt.Errorf("%s: set %s or %s_env, not both", at, key, key)
+	}
+	if *value = os.Getenv(env); *value == "" {
+		return fmt.Errorf("%s: env var %s (%s_env) is not set", at, env, key)
+	}
+	return nil
+}
+
+// load validates s and reads its token, and any URLs given as env vars, from
+// the environment.
 func (s *Search) load(at string) []error {
 	var errs []error
 	if !slices.Contains(SearchTypes, s.Type) {
@@ -138,9 +161,15 @@ func (s *Search) load(at string) []error {
 	} else if s.Token = os.Getenv(s.TokenEnv); s.Token == "" {
 		errs = append(errs, fmt.Errorf("%s: env var %s (token_env) is not set", at, s.TokenEnv))
 	}
-	for _, u := range []struct{ key, value string }{{"api_url", s.APIURL}, {"seerr_url", s.SeerrURL}} {
-		if u.value != "" && !isHTTPURL(u.value) {
-			errs = append(errs, fmt.Errorf("%s: %s must be an http(s) URL, got %q", at, u.key, u.value))
+	for _, u := range []struct {
+		key      string
+		value    *string
+		valueEnv string
+	}{{"api_url", &s.APIURL, s.APIURLEnv}, {"seerr_url", &s.SeerrURL, s.SeerrURLEnv}} {
+		if err := fromEnv(at, u.key, u.value, u.valueEnv); err != nil {
+			errs = append(errs, err)
+		} else if *u.value != "" && !isHTTPURL(*u.value) {
+			errs = append(errs, fmt.Errorf("%s: %s must be an http(s) URL, got %q", at, u.key, *u.value))
 		}
 	}
 	if s.Limit < 0 || s.Limit > MaxSearchLimit {
@@ -156,7 +185,7 @@ func (s *Search) load(at string) []error {
 		set          bool
 	}{
 		{"types", "jellyfin", len(s.Types) > 0},
-		{"seerr_url", "jellyfin", s.SeerrURL != ""},
+		{"seerr_url", "jellyfin", s.SeerrURL != "" || s.SeerrURLEnv != ""},
 		{"domains", "home-assistant", len(s.Domains) > 0},
 	} {
 		if o.set && s.Type != o.onlyFor {

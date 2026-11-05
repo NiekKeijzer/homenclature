@@ -70,6 +70,7 @@ func TestPageShowsLinksForGroups(t *testing.T) {
 	for _, app := range []string{"HOME_ASSISTANT", "IMMICH", "JELLYFIN", "MEALIE", "PAPERLESS", "SEERR"} {
 		t.Setenv("HOMENCLATURE_"+app+"_TOKEN", "test")
 	}
+	t.Setenv("HOMENCLATURE_IMMICH_URL", "https://photos.home.example")
 	example, err := os.ReadFile("../../config.example.toml")
 	if err != nil {
 		t.Fatal(err)
