@@ -32,21 +32,35 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0 # history and tags, to find what changed and the last release
-      # A Renovate merge (automerged minor, patch or digest update) that
-      # changes what goes into the image gets the next patch version. Majors
-      # are merged by hand, so they're released by hand.
-      - id: release
-        if: github.ref == 'refs/heads/main' && github.actor == 'renovate[bot]'
-        env:
-          BEFORE: ${{ github.event.before }}
+      # Merges seconds apart can reach this job out of order. Only the newest
+      # commit on main is built, released and synced (its image has the older
+      # commits too), so edge, latest and versions never go back to older code.
+      - id: tip
+        if: github.ref == 'refs/heads/main'
         run: |
-          if git diff --quiet "$BEFORE" HEAD -- go.mod go.sum Dockerfile package.json package-lock.json; then
-            echo "::notice::Image dependencies unchanged, no release"
-            exit 0
+          tip=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "::notice::main has moved on to $tip, which publishes instead"
+            echo "stale=true" >> "$GITHUB_OUTPUT"
           fi
+      # A Renovate merge (automerged minor, patch or digest update) that
+      # changes what goes into the image gets the next patch version, unless
+      # other commits since the last release are waiting: those, and majors
+      # (merged by hand), are released by hand.
+      - id: release
+        if: github.ref == 'refs/heads/main' && github.actor == 'renovate[bot]' && steps.tip.outputs.stale != 'true'
+        run: |
           last=$(git tag --list 'v*' --sort=-v:refname | grep -Em1 '^v[0-9]+\.[0-9]+\.[0-9]+$' || true)
           if [ -z "$last" ]; then
             echo "::notice::No release yet. Push the first v* tag by hand."
+            exit 0
+          fi
+          if [ -n "$(git log --format=%an "$last..HEAD" | grep -vFx 'renovate[bot]')" ]; then
+            echo "::notice::Commits besides Renovate's since $last, no release. Release them by hand."
+            exit 0
+          fi
+          if git diff --quiet "$last" HEAD -- go.mod go.sum Dockerfile package.json package-lock.json; then
+            echo "::notice::Image dependencies unchanged since $last, no release"
             exit 0
           fi
           IFS=. read -r major minor patch <<< "${last#v}"
@@ -67,13 +81,16 @@ jobs:
           images: |
             ghcr.io/niekkeijzer/homenclature
             docker.io/niekkeijzer/homenclature
-          # v* tags and releases -> 1.2.3, 1.2, latest; main -> edge.
+          # v* tags and releases -> 1.2.3, 1.2, latest; main -> edge; every
+          # build -> sha-<short commit>, to roll back to.
           # `value` is the release version; when empty, the pushed tag is used.
           tags: |
             type=semver,pattern={{version}},value=${{ steps.release.outputs.tag }}
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.release.outputs.tag }}
             type=edge,branch=main
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+            type=sha
+      - if: steps.tip.outputs.stale != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -90,7 +107,7 @@ jobs:
           git push origin "$TAG"
       # Docker Hub shows the README from main. Relative links and images
       # become GitHub URLs. Needs a token with read/write/delete scope.
-      - if: github.ref == 'refs/heads/main'
+      - if: github.ref == 'refs/heads/main' && steps.tip.outputs.stale != 'true'
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}

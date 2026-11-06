@@ -52,7 +52,7 @@ services:
 
 In your identity provider, create an OIDC client with the redirect URI `https://home.example.com/auth/callback`. Homenclature asks for the `openid profile email` scopes and reads group names from the `groups` claim. Authentik sends that claim by default.
 
-Image tags: `latest` and versions like `0.1.0` and `0.1` for releases, `edge` for the latest commit on `main`.
+Image tags: `latest` and versions like `0.1.0` and `0.1` for releases, `edge` for the latest commit on `main`, and `sha-` plus the short commit hash (like `sha-bbdecf7`) for each build, to roll back to.
 
 ### Settings
 

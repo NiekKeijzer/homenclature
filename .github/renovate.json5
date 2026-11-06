@@ -6,7 +6,8 @@
   packageRules: [
     {
       // Merged once CI passes. CI then publishes `edge` and, if the image
-      // changed, the next patch release (see .github/workflows/ci.yml).
+      // changed and only Renovate's commits are unreleased, the next patch
+      // release (see .github/workflows/ci.yml).
       matchUpdateTypes: ["minor", "patch", "digest"],
       automerge: true,
     },
