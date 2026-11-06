@@ -71,8 +71,10 @@ func (a *app) readKeys(r *http.Request, s session) userKeys {
 			return userKeys{Keys: stored.Keys, OnServer: true}
 		}
 	}
+	// Without a key store (the data dir unset later), there's no epoch to
+	// check: keys moved back to this browser are still its keys.
 	var k personalKeys
-	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub || k.Epoch != stored.Epoch {
+	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub || (a.store != nil && k.Epoch != stored.Epoch) {
 		return userKeys{Epoch: stored.Epoch}
 	}
 	return userKeys{Keys: k.Keys, Epoch: k.Epoch}

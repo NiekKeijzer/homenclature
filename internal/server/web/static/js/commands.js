@@ -6,7 +6,7 @@ const main = document.querySelector("main");
 const search = document.querySelector(".search input");
 const prompt = document.querySelector(".prompt");
 let group = ""; // the open command group; "" for the top level
-let sending = false; // a key command is on its way
+let sending = false; // a key command is on its way, or its answer shown
 let update; // the search's, see setup
 
 export const enabled = !!document.getElementById("commands");
@@ -92,20 +92,25 @@ function endPrompt() {
 
 // send posts a key command. Afterwards its group is open, to show the
 // change.
+// One at a time: a second one, sent before the first's answer, would carry
+// this browser's keys from before it.
 async function send(body, inGroup) {
   sending = true;
-  const resp = await fetch("/commands/keys", { method: "POST", body }).catch(() => null);
-  sending = false;
-  if (resp?.status === 401) return location.assign("/auth/login");
-  const text = (await resp?.text())?.trim();
-  if (!resp?.ok) {
-    keyField.readOnly = false;
-    keyField.select();
-    return note(text || "That didn't work. Try again.", true);
+  try {
+    const resp = await fetch("/commands/keys", { method: "POST", body }).catch(() => null);
+    if (resp?.status === 401) return location.assign("/auth/login");
+    const text = (await resp?.text())?.trim();
+    if (!resp?.ok) {
+      keyField.readOnly = false;
+      keyField.select();
+      return note(text || "That didn't work. Try again.", true);
+    }
+    cancel();
+    document.getElementById("commands").outerHTML = text;
+    open(inGroup ?? "");
+  } finally {
+    sending = false;
   }
-  cancel();
-  document.getElementById("commands").outerHTML = text;
-  open(inGroup ?? "");
 }
 
 // setup starts the commands. update is the search's: it shows what matches
@@ -115,7 +120,7 @@ export function setup(searchUpdate) {
 
   prompt?.addEventListener("submit", (e) => {
     e.preventDefault();
-    if (keyField.readOnly) return; // already checking
+    if (keyField.readOnly || sending) return; // already checking, or another is on its way
     keyField.readOnly = true;
     note(`Checking the key with ${prompt.dataset.name}…`);
     send(new URLSearchParams(new FormData(prompt)), prompt.dataset.group);

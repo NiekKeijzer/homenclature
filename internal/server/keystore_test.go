@@ -365,3 +365,13 @@ func TestKeysUnreadableFile(t *testing.T) {
 		t.Errorf("the other device's old cookie sent %q, want the shared key", got)
 	}
 }
+
+// Keys moved back to a browser carry an epoch. Without a key store (the data
+// dir unset later), they're still that browser's keys.
+func TestKeysEpochWithoutStore(t *testing.T) {
+	a, lastToken := newKeysApp(t)
+	moved := cookieFor(a, keysCookie, personalKeys{Sub: "test-sub", Keys: map[string]string{paperlessURL: "mine"}, Epoch: "e"}, time.Hour)
+	if got := tokenUsed(t, a, lastToken, login(a, "parents"), moved); got != "Token mine" {
+		t.Errorf("search sent %q, want the key in this browser", got)
+	}
+}
