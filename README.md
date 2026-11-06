@@ -23,7 +23,7 @@ Homenclature shows each person only the links for their groups. Everyone logs in
 - **Links per group.** Each OIDC group gets its own dashboard. Someone in several groups gets one merged page.
 - **Search.** Type to filter your links. `/` jumps to the search box and Enter opens the first match. Start with `>` for commands instead.
 - **Search inside your apps.** Opt in per app and the same box also finds films in Jellyfin, photos in Immich, recipes in Mealie, documents in Paperless and devices in Home Assistant. Results link straight to the item. Search only reads; it never changes anything in your apps.
-- **Your own keys.** People can search Home Assistant, Immich, Mealie and Paperless with their own API key, set with a command in the search box, so they find what their account can see. Keys stay encrypted in their browser; the server stores nothing.
+- **Your own keys.** People can search Home Assistant, Immich, Mealie and Paperless with their own API key, set with a command in the search box, so they find what their account can see. Keys stay encrypted in their browser, or, if you give it a data folder, on the server for all their devices, when they choose that.
 - **Request what's missing.** With Seerr opted in, search also lists matching films and shows that aren't in your library yet. One click opens the title in Seerr to request it.
 - **Icons by name.** Use any name from [dashboard-icons](https://github.com/homarr-labs/dashboard-icons), or a URL. The server fetches and caches them.
 - **Backgrounds.** Keep the glow, or pick hills under a sky that follows the time of day, your own photos, or an Immich album.
@@ -68,6 +68,7 @@ Image tags: `latest` and versions like `0.1.0` and `0.1` for releases, `edge` fo
 | `HOMENCLATURE_BACKGROUND_IMMICH_ALBUM` | Album ID for `immich`. |
 | `HOMENCLATURE_CONFIG` | Path to the config file. Default `/config/config.toml` in Docker. |
 | `HOMENCLATURE_LISTEN` | Listen address. Default `:8000`. |
+| `HOMENCLATURE_DATA_DIR` | Folder where people can keep their own keys, for all their devices. Unset: keys stay in browsers. See Your own keys below. |
 | Your app tokens | For search inside apps: one env var per app, named in the config (`token_env`). |
 | Your app URLs | Optional: any URL in the config can come from an env var you name instead (`url_env`, `api_url_env`, `seerr_url_env`). |
 
@@ -121,7 +122,23 @@ See [config.example.toml](config.example.toml) for every field, which token each
 
 For Home Assistant, Immich, Mealie and Paperless, people can use their own API key instead of the shared one. Type `>` in the search box for commands and choose "Manage your keys" (or type the app's name, e.g. `> immich`), then pick "Use your own … key" and paste the key into the box. A key is tried in the app before it's saved, and from then on that person's searches use it. The same list replaces or removes a key.
 
-There's no database: keys are kept in an encrypted cookie in that browser, tied to the person's login, for about a year after their last visit. On another device they add them again. Changing `HOMENCLATURE_SESSION_SECRET` clears everyone's keys, and searches go back to the shared token. Jellyfin (only admins make API keys) and Seerr (one admin key) always use the shared token.
+There's no database: keys are kept in an encrypted cookie in that browser, tied to the person's login, for about a year after their last visit. On another device they add them again. Jellyfin (only admins make API keys) and Seerr (one admin key) always use the shared token.
+
+To let people keep their keys on the server instead, so they work on every device they log in on, set `HOMENCLATURE_DATA_DIR` and give it a volume:
+
+```yaml
+    volumes:
+      - homenclature-data:/data
+    environment:
+      HOMENCLATURE_DATA_DIR: /data
+
+volumes:
+  homenclature-data:
+```
+
+Each person then chooses for themselves, with "Keep your keys on all your devices" in the same list. Their keys move to one encrypted file on the server, and out of that browser. "Keep your keys in this browser only" moves them back into that browser, and other devices lose them. The app doesn't start if it can't write to the folder (with a bind mount, make it writable for uid 65532).
+
+Changing `HOMENCLATURE_SESSION_SECRET` clears everyone's keys, in browsers and on the server, and searches go back to the shared token.
 
 ### Background
 

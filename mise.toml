@@ -28,6 +28,7 @@ HOMENCLATURE_OIDC_CLIENT_ID = "homenclature"
 HOMENCLATURE_OIDC_CLIENT_SECRET = "dev"
 HOMENCLATURE_SESSION_SECRET = "dev-only-session-secret-not-for-production"
 HOMENCLATURE_BACKGROUND="landscape"
+HOMENCLATURE_DATA_DIR = "dev/data" # personal keys people keep on the server (gitignored)
 # Search tokens for config.example.toml: your own if set in .env or exported, else "dev"
 # (the example's apps don't exist, so their searches fail: logged, not shown).
 # Task env beats [env] and the shell, so read them via env (get_env misses .env).

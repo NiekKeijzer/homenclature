@@ -42,7 +42,20 @@
       {{else}}
       <p class="note">None of your apps take a key of your own.</p>
       {{end}}
+      {{if .OnServer}}
+      <p class="note">Your keys are kept encrypted on the server, for every device you log in on.</p>
+      {{else}}
       <p class="note">Your keys are kept encrypted in this browser only, for about a year after your last visit. On other devices, add them again.</p>
+      {{end}}
+      {{if .CanMove}}
+      <form class="key-move" id="where" method="post" action="/keys">
+        {{if .OnServer}}
+        <button name="action" value="browser">Keep them in this browser only</button>
+        {{else}}
+        <button name="action" value="server">Keep them on all your devices</button>
+        {{end}}
+      </form>
+      {{end}}
     </section>
     <a class="back" href="/">Back</a>
   </main>

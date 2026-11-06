@@ -52,7 +52,8 @@
 #
 #   People can search home-assistant, immich, mealie and paperless with their
 #   own key instead (type > in the search box for commands). It's kept in their
-#   browser and replaces this token for them only; token_env is still required.
+#   browser (or on the server, if they choose and HOMENCLATURE_DATA_DIR is set)
+#   and replaces this token for them only; token_env is still required.
 #
 #   Tokens:
 #     home-assistant  Profile > Security > Long-lived access tokens. Tokens

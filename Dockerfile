@@ -13,9 +13,13 @@ COPY . .
 COPY --from=assets /src/internal/server/web/static/lib internal/server/web/static/lib
 ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /out/homenclature ./cmd/homenclature
+RUN mkdir /out/data
 
 FROM gcr.io/distroless/static-debian13:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
 COPY --from=build /out/homenclature /homenclature
+# For HOMENCLATURE_DATA_DIR=/data (off unless set): owned by nonroot, so a
+# named volume mounted there is writable.
+COPY --from=build --chown=65532:65532 /out/data /data
 ENV HOMENCLATURE_CONFIG=/config/config.toml
 ENV HOMENCLATURE_BACKGROUND_DIR=/backgrounds
 EXPOSE 8000

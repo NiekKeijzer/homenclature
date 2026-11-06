@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/NiekKeijzer/homenclature/internal/config"
@@ -27,6 +28,8 @@ type app struct {
 	secure    bool        // set the Secure flag on cookies (HTTPS)
 	icons     *iconProxy
 	providers map[string]search.Provider // by searchKey
+	store     *keyStore                  // personal keys kept on the server; nil if off
+	keyLocks  sync.Map                   // by sub: a *sync.Mutex, see lockKeys
 	bg        background
 	oauth     *oauth2.Config
 	verifier  *oidc.IDTokenVerifier
@@ -36,6 +39,7 @@ type env struct {
 	configPath, listen, baseURL    string
 	issuer, clientID, clientSecret string
 	sessionSecret                  string
+	dataDir                        string // for the key store; empty: off
 }
 
 // Run reads settings from env vars, loads the config and serves until the
@@ -58,6 +62,9 @@ func Run() error {
 	if a.providers, err = newProviders(cfg); err != nil {
 		return fmt.Errorf("search: %w", err)
 	}
+	if a.store, err = newKeyStore(e.dataDir, e.sessionSecret); err != nil {
+		return fmt.Errorf("HOMENCLATURE_DATA_DIR: %w", err)
+	}
 	if a.bg, err = newBackground(cfg); err != nil {
 		return fmt.Errorf("background: %w", err)
 	}
@@ -79,6 +86,7 @@ func readEnv() (env, error) {
 		clientID:      os.Getenv("HOMENCLATURE_OIDC_CLIENT_ID"),
 		clientSecret:  os.Getenv("HOMENCLATURE_OIDC_CLIENT_SECRET"),
 		sessionSecret: os.Getenv("HOMENCLATURE_SESSION_SECRET"),
+		dataDir:       os.Getenv("HOMENCLATURE_DATA_DIR"),
 	}
 	var errs []error
 	for _, v := range []struct{ name, value string }{

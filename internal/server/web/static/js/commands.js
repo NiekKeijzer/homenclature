@@ -6,6 +6,7 @@ const main = document.querySelector("main");
 const search = document.querySelector(".search input");
 const prompt = document.querySelector(".prompt");
 let group = ""; // the open command group; "" for the top level
+let sending = false; // a key command is on its way, or its answer shown
 let update; // the search's, see setup
 
 export const enabled = !!document.getElementById("commands");
@@ -63,7 +64,14 @@ const note = (text, error) => {
 function run(command) {
   const { opens, key, action, name, help } = command.dataset;
   if (opens) return open(opens);
-  if (action === "remove") return send(new URLSearchParams({ app: key, action }), command.dataset.group);
+  if (action !== "save") {
+    // Remove a key, or move all keys: nothing to ask. Once, for a double
+    // click.
+    if (sending) return;
+    const body = new URLSearchParams({ action });
+    if (key) body.set("app", key);
+    return send(body, command.dataset.group);
+  }
   prompt.elements.app.value = key;
   prompt.dataset.name = name;
   prompt.dataset.group = command.dataset.group;
@@ -84,18 +92,25 @@ function endPrompt() {
 
 // send posts a key command. Afterwards its group is open, to show the
 // change.
+// One at a time: a second one, sent before the first's answer, would carry
+// this browser's keys from before it.
 async function send(body, inGroup) {
-  const resp = await fetch("/commands/keys", { method: "POST", body }).catch(() => null);
-  if (resp?.status === 401) return location.assign("/auth/login");
-  const text = (await resp?.text())?.trim();
-  if (!resp?.ok) {
-    keyField.readOnly = false;
-    keyField.select();
-    return note(text || "That didn't work. Try again.", true);
+  sending = true;
+  try {
+    const resp = await fetch("/commands/keys", { method: "POST", body }).catch(() => null);
+    if (resp?.status === 401) return location.assign("/auth/login");
+    const text = (await resp?.text())?.trim();
+    if (!resp?.ok) {
+      keyField.readOnly = false;
+      keyField.select();
+      return note(text || "That didn't work. Try again.", true);
+    }
+    cancel();
+    document.getElementById("commands").outerHTML = text;
+    open(inGroup ?? "");
+  } finally {
+    sending = false;
   }
-  cancel();
-  document.getElementById("commands").outerHTML = text;
-  open(inGroup ?? "");
 }
 
 // setup starts the commands. update is the search's: it shows what matches
@@ -105,7 +120,7 @@ export function setup(searchUpdate) {
 
   prompt?.addEventListener("submit", (e) => {
     e.preventDefault();
-    if (keyField.readOnly) return; // already checking
+    if (keyField.readOnly || sending) return; // already checking, or another is on its way
     keyField.readOnly = true;
     note(`Checking the key with ${prompt.dataset.name}…`);
     send(new URLSearchParams(new FormData(prompt)), prompt.dataset.group);
