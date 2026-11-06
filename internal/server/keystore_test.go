@@ -33,11 +33,11 @@ func TestKeyStore(t *testing.T) {
 	if stored, ok := ks.get("me"); ok || stored.OnServer || stored.Keys != nil {
 		t.Fatalf("before put: got %+v, %t; want nothing", stored, ok)
 	}
-	want := storedKeys{OnServer: true, Gen: 2, Keys: map[string]string{paperlessURL: "mine"}}
+	want := storedKeys{OnServer: true, Epoch: "e", Keys: map[string]string{paperlessURL: "mine"}}
 	if err := ks.put("me", want); err != nil {
 		t.Fatal(err)
 	}
-	if stored, ok := ks.get("me"); !ok || !stored.OnServer || stored.Gen != 2 || stored.Keys[paperlessURL] != "mine" {
+	if stored, ok := ks.get("me"); !ok || !stored.OnServer || stored.Epoch != "e" || stored.Keys[paperlessURL] != "mine" {
 		t.Errorf("got %+v, %t; want %+v", stored, ok, want)
 	}
 
@@ -251,7 +251,7 @@ func TestKeysStaleCookie(t *testing.T) {
 func TestRenewKeysOnServer(t *testing.T) {
 	a, _ := newKeysApp(t)
 	a.store = newTestStore(t, t.TempDir())
-	a.store.put("test-sub", storedKeys{OnServer: true, Gen: 1, Keys: map[string]string{paperlessURL: "mine"}})
+	a.store.put("test-sub", storedKeys{OnServer: true, Keys: map[string]string{paperlessURL: "mine"}})
 	req := httptest.NewRequest(http.MethodGet, "/auth/callback", nil)
 	req.AddCookie(keysFor(a, "test-sub", map[string]string{paperlessURL: "old"}, time.Hour))
 	rec := httptest.NewRecorder()
@@ -318,5 +318,50 @@ search = { type = "paperless", token_env = "TEST_TOKEN", api_url = "`+paperless.
 	req.AddCookie(savedKeys(resp))
 	if k := a.readKeys(req, session{Sub: "test-sub"}); k.Keys[paperlessURL] != "slow" {
 		t.Errorf("the move lost the saved key: %+v", k)
+	}
+}
+
+// A repeated move, as from a double click, carries this browser's cookie
+// from before the first one's answer. It changes nothing, so it must not
+// overwrite the cookie the first one set.
+func TestKeysMoveTwice(t *testing.T) {
+	a, lastToken := newKeysApp(t)
+	a.store = newTestStore(t, t.TempDir())
+	me := login(a, "parents")
+	moveKeys(a, "server", me, keysFor(a, "test-sub", map[string]string{paperlessURL: "mine"}, time.Hour))
+
+	first := moveKeys(a, "browser", me)
+	second := moveKeys(a, "browser", me)
+	if first.StatusCode != http.StatusOK || second.StatusCode != http.StatusOK {
+		t.Fatalf("got %d and %d, want 200 twice", first.StatusCode, second.StatusCode)
+	}
+	if c := savedKeys(second); c != nil {
+		t.Errorf("the repeated move set keys cookie %v", c)
+	}
+	if got := tokenUsed(t, a, lastToken, me, savedKeys(first)); got != "Token mine" {
+		t.Errorf("search sent %q, want the key moved back", got)
+	}
+}
+
+// A file that can't be read counts as keys on the server, without any.
+// Moving them back must still make old cookies from other devices stale.
+func TestKeysUnreadableFile(t *testing.T) {
+	a, lastToken := newKeysApp(t)
+	dir := t.TempDir()
+	a.store = newTestStore(t, dir)
+	me := login(a, "parents")
+	other := keysFor(a, "test-sub", map[string]string{paperlessURL: "mine"}, time.Hour) // another device, from before
+	moveKeys(a, "server", me)
+	os.WriteFile(a.store.path("test-sub"), []byte("not a keys file, not even encrypted"), 0o600)
+
+	if html := body(t, get(a, "/", me)); !strings.Contains(html, "Keep your keys in this browser only") {
+		t.Fatal("an unreadable file should count as keys on the server")
+	}
+	resp := moveKeys(a, "browser", me)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("move back: got %d", resp.StatusCode)
+	}
+	if got := tokenUsed(t, a, lastToken, me, other); got != "Token shared" {
+		t.Errorf("the other device's old cookie sent %q, want the shared key", got)
 	}
 }

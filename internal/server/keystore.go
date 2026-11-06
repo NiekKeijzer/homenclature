@@ -25,10 +25,11 @@ type keyStore struct {
 }
 
 // storedKeys is a person's file. It records their choice, so it stays while
-// they have no keys, and after they move them back to a browser, to keep Gen.
+// they have no keys, and after they move them back to a browser, to keep
+// Epoch.
 type storedKeys struct {
-	OnServer bool              `json:"on_server"` // false: they moved them back to a browser
-	Gen      int               `json:"gen"`       // see userKeys.Gen
+	OnServer bool              `json:"on_server"`       // false: they moved them back to a browser
+	Epoch    string            `json:"epoch,omitempty"` // see userKeys.Epoch
 	Keys     map[string]string `json:"keys,omitempty"`
 }
 

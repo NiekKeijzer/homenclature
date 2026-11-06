@@ -6,6 +6,7 @@ const main = document.querySelector("main");
 const search = document.querySelector(".search input");
 const prompt = document.querySelector(".prompt");
 let group = ""; // the open command group; "" for the top level
+let sending = false; // a key command is on its way
 let update; // the search's, see setup
 
 export const enabled = !!document.getElementById("commands");
@@ -64,7 +65,9 @@ function run(command) {
   const { opens, key, action, name, help } = command.dataset;
   if (opens) return open(opens);
   if (action !== "save") {
-    // Remove a key, or move all keys: nothing to ask.
+    // Remove a key, or move all keys: nothing to ask. Once, for a double
+    // click.
+    if (sending) return;
     const body = new URLSearchParams({ action });
     if (key) body.set("app", key);
     return send(body, command.dataset.group);
@@ -90,7 +93,9 @@ function endPrompt() {
 // send posts a key command. Afterwards its group is open, to show the
 // change.
 async function send(body, inGroup) {
+  sending = true;
   const resp = await fetch("/commands/keys", { method: "POST", body }).catch(() => null);
+  sending = false;
   if (resp?.status === 401) return location.assign("/auth/login");
   const text = (await resp?.text())?.trim();
   if (!resp?.ok) {

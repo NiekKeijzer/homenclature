@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"log"
 	"maps"
@@ -40,19 +41,20 @@ var keyHelp = map[string]string{
 
 // personalKeys is the keys cookie.
 type personalKeys struct {
-	Sub  string            `json:"sub"`           // whose keys they are
-	Keys map[string]string `json:"keys"`          // by link URL
-	Gen  int               `json:"gen,omitempty"` // userKeys.Gen when it was set
+	Sub   string            `json:"sub"`             // whose keys they are
+	Keys  map[string]string `json:"keys"`            // by link URL
+	Epoch string            `json:"epoch,omitempty"` // userKeys.Epoch when it was set
 }
 
 // userKeys are the user's own keys, and where they're kept.
 type userKeys struct {
 	Keys     map[string]string // by link URL; nil if they have none
 	OnServer bool              // in the key store, for all their devices; else in this browser
-	// Gen counts the user's moves to the server (0 if none). A keys cookie
-	// from an older one was left on another device meanwhile, so it's stale:
-	// once the keys are back in a browser, only that browser's count.
-	Gen int
+	// Epoch is new and random each time the keys move back from the server
+	// to a browser, and only the cookie set then carries it. Any other keys
+	// cookie was left on another device before, so it's stale. Being random,
+	// it can't repeat, even if the file couldn't be read.
+	Epoch string
 }
 
 // readKeys returns the user's own keys: from the key store if they keep
@@ -66,48 +68,51 @@ func (a *app) readKeys(r *http.Request, s session) userKeys {
 	if a.store != nil {
 		stored, _ = a.store.get(s.Sub)
 		if stored.OnServer {
-			return userKeys{Keys: stored.Keys, OnServer: true, Gen: stored.Gen}
+			return userKeys{Keys: stored.Keys, OnServer: true}
 		}
 	}
 	var k personalKeys
-	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub || k.Gen != stored.Gen {
-		return userKeys{Gen: stored.Gen}
+	if !a.readCookie(r, keysCookie, &k) || k.Sub != s.Sub || k.Epoch != stored.Epoch {
+		return userKeys{Epoch: stored.Epoch}
 	}
-	return userKeys{Keys: k.Keys, Gen: k.Gen}
+	return userKeys{Keys: k.Keys, Epoch: k.Epoch}
 }
 
 // renewKeys gives the user's keys in this browser a fresh TTL, so they only
 // expire after keysTTL without a login.
 func (a *app) renewKeys(w http.ResponseWriter, r *http.Request, s session) {
 	if k := a.readKeys(r, s); !k.OnServer && len(k.Keys) > 0 {
-		a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys, k.Gen}, keysTTL)
+		a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys, k.Epoch}, keysTTL)
 	}
 }
 
-// writeKeys saves k where it says. Moved to the server, the keys leave this
-// browser and Gen goes up, so the cookies left anywhere go stale. Moved back,
-// the file stays without keys, to keep Gen.
-func (a *app) writeKeys(w http.ResponseWriter, s session, k userKeys, wasOnServer bool) error {
+// writeKeys saves k, changed from was, where it says. Moved to the server,
+// the keys leave this browser. Moved back, the file stays without keys, to
+// keep a new Epoch, so the cookies left anywhere go stale.
+func (a *app) writeKeys(w http.ResponseWriter, s session, k, was userKeys) error {
+	// Nothing changed: a repeated request, say from a double click, which
+	// carries this browser's cookie from before the first one's answer.
+	if k.OnServer == was.OnServer && maps.Equal(k.Keys, was.Keys) {
+		return nil
+	}
 	if k.OnServer {
-		if !wasOnServer {
-			k.Gen++
-		}
-		if err := a.store.put(s.Sub, storedKeys{OnServer: true, Gen: k.Gen, Keys: k.Keys}); err != nil {
+		if err := a.store.put(s.Sub, storedKeys{OnServer: true, Keys: k.Keys}); err != nil {
 			return err
 		}
 		// Keys read from this browser were the user's; with none, a keys
 		// cookie here is someone else's, so it stays.
-		if !wasOnServer && len(k.Keys) > 0 {
+		if !was.OnServer && len(k.Keys) > 0 {
 			a.clearCookie(w, keysCookie)
 		}
 		return nil
 	}
-	if wasOnServer {
-		if err := a.store.put(s.Sub, storedKeys{Gen: k.Gen}); err != nil {
+	if was.OnServer {
+		k.Epoch = rand.Text()
+		if err := a.store.put(s.Sub, storedKeys{Epoch: k.Epoch}); err != nil {
 			return err
 		}
 	}
-	a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys, k.Gen}, keysTTL)
+	a.setCookie(w, keysCookie, personalKeys{s.Sub, k.Keys, k.Epoch}, keysTTL)
 	return nil
 }
 
@@ -183,7 +188,7 @@ func (a *app) saveKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.lockKeys(s.Sub)()
-	k, wasOnServer := a.keysToChange(r, s)
+	k, was := a.keysToChange(r, s)
 	apps := a.keyApps(s, k.Keys)
 	i, failed, ok := a.changeKeys(r, apps, &k)
 	switch {
@@ -193,7 +198,7 @@ func (a *app) saveKey(w http.ResponseWriter, r *http.Request) {
 		apps[i].Error = failed
 		a.renderKeys(w, s, apps, k.OnServer, http.StatusUnprocessableEntity)
 	default:
-		if err := a.writeKeys(w, s, k, wasOnServer); err != nil {
+		if err := a.writeKeys(w, s, k, was); err != nil {
 			log.Printf("keys: save: %v", err)
 			http.Error(w, "Your keys couldn't be saved. Try again later.", http.StatusInternalServerError)
 			return
@@ -215,7 +220,7 @@ func (a *app) commandKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer a.lockKeys(s.Sub)()
-	k, wasOnServer := a.keysToChange(r, s)
+	k, was := a.keysToChange(r, s)
 	apps := a.keyApps(s, k.Keys)
 	i, failed, ok := a.changeKeys(r, apps, &k)
 	switch {
@@ -226,7 +231,7 @@ func (a *app) commandKey(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, failed, http.StatusUnprocessableEntity)
 		return
 	}
-	if err := a.writeKeys(w, s, k, wasOnServer); err != nil {
+	if err := a.writeKeys(w, s, k, was); err != nil {
 		log.Printf("keys: save: %v", err)
 		http.Error(w, "Your keys couldn't be saved. Try again later.", http.StatusInternalServerError)
 		return
@@ -247,15 +252,16 @@ func (a *app) commandKey(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// keysToChange returns a copy of the user's keys, and whether they're on the
-// server now.
-func (a *app) keysToChange(r *http.Request, s session) (userKeys, bool) {
-	k := a.readKeys(r, s)
-	k.Keys = maps.Clone(k.Keys)
+// keysToChange returns a copy of the user's keys to change, and the keys as
+// they are.
+func (a *app) keysToChange(r *http.Request, s session) (k, was userKeys) {
+	was = a.readKeys(r, s)
+	k = was
+	k.Keys = maps.Clone(was.Keys)
 	if k.Keys == nil {
 		k.Keys = map[string]string{}
 	}
-	return k, k.OnServer
+	return k, was
 }
 
 // changeKeys applies a posted key form to k: save an app's key if the app
